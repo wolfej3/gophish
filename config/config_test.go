@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -62,7 +63,7 @@ func TestLoadConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error unmarshaling config: %v", err)
 	}
-	expectedConfig.MigrationsPath = expectedConfig.MigrationsPath + expectedConfig.DBName
+	expectedConfig.MigrationsPath = filepath.Join(expectedConfig.MigrationsPath+expectedConfig.DBName, "migrations")
 	expectedConfig.TestFlag = false
 	expectedConfig.AdminConf.CSRFKey = ""
 	expectedConfig.Logging = &log.Config{}
@@ -74,5 +75,21 @@ func TestLoadConfig(t *testing.T) {
 	_, err = LoadConfig("bogusfile")
 	if err == nil {
 		t.Fatalf("expected error when loading invalid config, but got %v", err)
+	}
+}
+
+// TestShippedConfigMigrationsPath ensures the migrations path built from the
+// shipped config.json points at a directory containing migrations.
+func TestShippedConfigMigrationsPath(t *testing.T) {
+	conf, err := LoadConfig("../config.json")
+	if err != nil {
+		t.Fatalf("error loading shipped config: %v", err)
+	}
+	migrations, err := filepath.Glob(filepath.Join("..", conf.MigrationsPath, "*.sql"))
+	if err != nil {
+		t.Fatalf("error listing migrations: %v", err)
+	}
+	if len(migrations) == 0 {
+		t.Fatalf("no migrations found in %s", conf.MigrationsPath)
 	}
 }

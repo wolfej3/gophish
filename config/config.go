@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"io/ioutil"
+	"path/filepath"
 
 	log "github.com/gophish/gophish/logger"
 )
@@ -46,9 +47,9 @@ var Version = ""
 const ServerName = "gophish"
 
 // LoadConfig loads the configuration from the specified filepath
-func LoadConfig(filepath string) (*Config, error) {
+func LoadConfig(configPath string) (*Config, error) {
 	// Get the config file
-	configFile, err := ioutil.ReadFile(filepath)
+	configFile, err := ioutil.ReadFile(configPath)
 	if err != nil {
 		return nil, err
 	}
@@ -60,8 +61,10 @@ func LoadConfig(filepath string) (*Config, error) {
 	if config.Logging == nil {
 		config.Logging = &log.Config{}
 	}
-	// Choosing the migrations directory based on the database used.
-	config.MigrationsPath = config.MigrationsPath + config.DBName
+	// Choosing the migrations directory based on the database used. goose
+	// only reads migrations from the exact directory it's given, so we point
+	// it at the migrations folder itself.
+	config.MigrationsPath = filepath.Join(config.MigrationsPath+config.DBName, "migrations")
 	// Explicitly set the TestFlag to false to prevent config.json overrides
 	config.TestFlag = false
 	return config, nil
