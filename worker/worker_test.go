@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gophish/gophish/config"
+	"github.com/gophish/gophish/internal/testdb"
 	"github.com/gophish/gophish/mailer"
 	"github.com/gophish/gophish/models"
 )
@@ -27,11 +28,7 @@ type testContext struct {
 }
 
 func setupTest(t *testing.T) *testContext {
-	conf := &config.Config{
-		DBName:         "sqlite3",
-		DBPath:         ":memory:",
-		MigrationsPath: "../db/db_sqlite3/migrations/",
-	}
+	conf := testdb.Config(t, "..")
 	err := models.Setup(conf)
 	if err != nil {
 		t.Fatalf("Failed creating database: %v", err)
@@ -138,12 +135,19 @@ func TestMailLogGrouping(t *testing.T) {
 	worker.mailer = lm
 
 	// Trigger the worker, generating the maillogs and sending them to the
-	// mailer
-	worker.processCampaigns(time.Now())
+	// mailer. MySQL rounds datetimes to the nearest second, so a send date
+	// can be stored up to half a second in the future; we look a second ahead
+	// to make sure every maillog is due.
+	worker.processCampaigns(time.Now().Add(time.Second))
 
 	// Verify that each slice of maillogs received belong to the same campaign
 	for i := 0; i < 10; i++ {
-		ms := <-lm.queue
+		var ms []mailer.Mail
+		select {
+		case ms = <-lm.queue:
+		case <-time.After(10 * time.Second):
+			t.Fatalf("timed out waiting for maillogs: received %d of 10 campaigns", i)
+		}
 		maillog, ok := ms[0].(*models.MailLog)
 		if !ok {
 			t.Fatalf("unable to cast mail to models.MailLog")

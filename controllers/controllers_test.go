@@ -9,6 +9,7 @@ import (
 
 	"github.com/gophish/gophish/auth"
 	"github.com/gophish/gophish/config"
+	"github.com/gophish/gophish/internal/testdb"
 	"github.com/gophish/gophish/models"
 )
 
@@ -24,11 +25,7 @@ type testContext struct {
 func setupTest(t *testing.T) *testContext {
 	wd, _ := os.Getwd()
 	fmt.Println(wd)
-	conf := &config.Config{
-		DBName:         "sqlite3",
-		DBPath:         ":memory:",
-		MigrationsPath: "../db/db_sqlite3/migrations/",
-	}
+	conf := testdb.Config(t, "..")
 	abs, _ := filepath.Abs("../db/db_sqlite3/migrations/")
 	fmt.Printf("in controllers_test.go: %s\n", abs)
 	err := models.Setup(conf)
