@@ -9,6 +9,7 @@ import (
 	"github.com/gophish/gophish/auth"
 	ctx "github.com/gophish/gophish/context"
 	log "github.com/gophish/gophish/logger"
+	mid "github.com/gophish/gophish/middleware"
 	"github.com/gophish/gophish/models"
 	"github.com/gorilla/mux"
 	"gorm.io/gorm"
@@ -221,6 +222,17 @@ func (as *Server) User(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			JSONResponse(w, models.Response{Success: false, Message: err.Error()}, http.StatusInternalServerError)
 			return
+		}
+		// A locked account is signed out everywhere. A new password signs the
+		// user out of every session other than this one.
+		switch {
+		case existingUser.AccountLocked:
+			err = models.DeleteUserSessions(existingUser.Id, "")
+		case ur.Password != "":
+			err = mid.RevokeOtherSessions(r, existingUser.Id)
+		}
+		if err != nil {
+			log.Errorf("error revoking sessions for user %d: %v", existingUser.Id, err)
 		}
 		JSONResponse(w, existingUser, http.StatusOK)
 	}

@@ -16,7 +16,7 @@ func (s *ModelsSuite) TestModelColumnsMatchSchema(c *check.C) {
 		&User{}, &Role{}, &Permission{}, &Campaign{}, &Event{}, &Result{},
 		&MailLog{}, &Group{}, &Target{}, &GroupTarget{}, &Template{},
 		&Attachment{}, &Page{}, &SMTP{}, &Header{}, &IMAP{}, &Webhook{},
-		&EmailRequest{},
+		&EmailRequest{}, &Session{},
 	}
 	migrator := db.Migrator()
 	for _, model := range models {

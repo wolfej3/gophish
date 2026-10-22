@@ -121,9 +121,9 @@ func RequireLogin(handler http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if u := ctx.Get(r, "user"); u != nil {
 			// If a password change is required for the user, then redirect them
-			// to the login page
+			// to the password reset page. They can still log out instead.
 			currentUser := u.(models.User)
-			if currentUser.PasswordChangeRequired && r.URL.Path != "/reset_password" {
+			if currentUser.PasswordChangeRequired && r.URL.Path != "/reset_password" && r.URL.Path != "/logout" {
 				q := r.URL.Query()
 				q.Set("next", r.URL.Path)
 				http.Redirect(w, r, fmt.Sprintf("/reset_password?%s", q.Encode()), http.StatusTemporaryRedirect)

@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 
 	ctx "github.com/gophish/gophish/context"
 	"github.com/gophish/gophish/models"
@@ -255,5 +257,41 @@ func TestModifyWithExistingUsername(t *testing.T) {
 	}
 	if got.Message != expectedResponse.Message {
 		t.Fatalf("incorrect error received when setting role. expected %s got %s", expectedResponse.Message, got.Message)
+	}
+}
+
+// TestModifyUserRevokesSessions ensures that locking an account or setting a
+// new password through the API signs the user out of their sessions.
+func TestModifyUserRevokesSessions(t *testing.T) {
+	tests := map[string]userRequest{
+		"locked":       {AccountLocked: true},
+		"new password": {Password: "a-new-Passw0rd!"},
+	}
+	for name, payload := range tests {
+		testCtx := setupTest(t)
+		user := createUnpriviledgedUser(t, models.RoleUser)
+		token := "session-for-" + user.Username
+		err := models.PutSession(token, &user.Id, nil, time.Now().Add(time.Hour))
+		if err != nil {
+			t.Fatalf("%s: error creating session: %v", name, err)
+		}
+
+		payload.Username = user.Username
+		payload.Role = user.Role.Slug
+		body, err := json.Marshal(payload)
+		if err != nil {
+			t.Fatalf("%s: error marshaling userRequest payload: %v", name, err)
+		}
+		r := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/users/%d", user.Id), bytes.NewBuffer(body))
+		r.Header.Set("Content-Type", "application/json")
+		r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", testCtx.admin.ApiKey))
+		w := httptest.NewRecorder()
+		testCtx.apiServer.ServeHTTP(w, r)
+		if w.Code != http.StatusOK {
+			t.Fatalf("%s: unexpected status code. expected %d got %d", name, http.StatusOK, w.Code)
+		}
+		if _, err := models.GetSessionByToken(token); err != gorm.ErrRecordNotFound {
+			t.Fatalf("%s: expected session to be revoked, got error %v", name, err)
+		}
 	}
 }

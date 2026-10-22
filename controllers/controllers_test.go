@@ -29,9 +29,7 @@ func setupTest(t *testing.T) *testContext {
 	// The admin server requires TLS (or a TLS-terminating proxy), so we test
 	// it over HTTPS the same way browsers will reach it.
 	ctx.config.AdminConf.UseTLS = true
-	ctx.adminServer = httptest.NewUnstartedServer(NewAdminServer(ctx.config.AdminConf).server.Handler)
-	ctx.adminServer.Config.Addr = ctx.config.AdminConf.ListenURL
-	ctx.adminServer.StartTLS()
+	ctx.adminServer = newTestAdminServer(ctx)
 	// Get the API key to use for these tests
 	u, err := models.GetUser(1)
 	// Reset the temporary password for the admin user to a value we control
@@ -56,6 +54,14 @@ func setupTest(t *testing.T) *testContext {
 	ctx.phishServer.Start()
 	createTestData(t)
 	return ctx
+}
+
+// newTestAdminServer starts an admin server over HTTPS using the test config.
+func newTestAdminServer(ctx *testContext) *httptest.Server {
+	server := httptest.NewUnstartedServer(NewAdminServer(ctx.config.AdminConf).server.Handler)
+	server.Config.Addr = ctx.config.AdminConf.ListenURL
+	server.StartTLS()
+	return server
 }
 
 func tearDown(t *testing.T, ctx *testContext) {

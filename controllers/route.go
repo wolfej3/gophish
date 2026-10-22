@@ -288,6 +288,10 @@ func (as *AdminServer) Settings(w http.ResponseWriter, r *http.Request) {
 			api.JSONResponse(w, msg, http.StatusInternalServerError)
 			return
 		}
+		// Sign out any other sessions using the old password
+		if err = mid.RevokeOtherSessions(r, u.Id); err != nil {
+			log.Error(err)
+		}
 		api.JSONResponse(w, msg, http.StatusOK)
 	}
 }
@@ -352,6 +356,13 @@ func (as *AdminServer) Impersonate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		session := ctx.Get(r, "session").(*sessions.Session)
+		// Issue a new session token for the impersonated account
+		err = mid.RegenerateSession(session)
+		if err != nil {
+			log.Error(err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
 		session.Values["id"] = u.Id
 		session.Save(r, w)
 	}
@@ -403,9 +414,20 @@ func (as *AdminServer) Login(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Error(err)
 		}
-		// If we've logged in, save the session and redirect to the dashboard
+		// If we've logged in, save the session under a new token and redirect
+		// to the dashboard
+		err = mid.RegenerateSession(session)
+		if err != nil {
+			log.Error(err)
+			as.handleInvalidLogin(w, r, "Error creating session")
+			return
+		}
 		session.Values["id"] = u.Id
 		session.Save(r, w)
+		err = models.DeleteExpiredSessions()
+		if err != nil {
+			log.Error(err)
+		}
 		as.nextOrIndex(w, r)
 	}
 }
@@ -413,7 +435,13 @@ func (as *AdminServer) Login(w http.ResponseWriter, r *http.Request) {
 // Logout destroys the current user session
 func (as *AdminServer) Logout(w http.ResponseWriter, r *http.Request) {
 	session := ctx.Get(r, "session").(*sessions.Session)
-	delete(session.Values, "id")
+	// Delete the logged in session so its token can't be reused, keeping only
+	// the logout message for the login page
+	err := mid.RegenerateSession(session)
+	if err != nil {
+		log.Error(err)
+	}
+	session.Values = make(map[interface{}]interface{})
 	Flash(w, r, "success", "You have successfully logged out")
 	session.Save(r, w)
 	http.Redirect(w, r, "/login", http.StatusFound)
@@ -469,6 +497,10 @@ func (as *AdminServer) ResetPassword(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			getTemplate(w, "reset_password").ExecuteTemplate(w, "base", params)
 			return
+		}
+		// Sign out any other sessions using the old password
+		if err = mid.RevokeOtherSessions(r, u.Id); err != nil {
+			log.Error(err)
 		}
 		// TODO: We probably want to flash a message here that the password was
 		// changed successfully. The problem is that when the user resets their

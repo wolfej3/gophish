@@ -33,7 +33,7 @@ func (s *ModelsSuite) TearDownTest(c *check.C) {
 	cleanup := db.Session(&gorm.Session{AllowGlobalUpdate: true})
 	for _, model := range []interface{}{
 		&Group{}, &Target{}, &GroupTarget{}, &SMTP{}, &Header{}, &Page{}, &Template{}, &Attachment{},
-		&Result{}, &Event{}, &MailLog{}, &Campaign{},
+		&Result{}, &Event{}, &MailLog{}, &Campaign{}, &Session{},
 	} {
 		if err := cleanup.Delete(model).Error; err != nil {
 			panic(err)
@@ -130,7 +130,7 @@ func resetBenchmark(b *testing.B) {
 	cleanup := db.Session(&gorm.Session{AllowGlobalUpdate: true})
 	for _, model := range []interface{}{
 		&Group{}, &Target{}, &GroupTarget{}, &SMTP{}, &Header{}, &Page{}, &Template{}, &Attachment{},
-		&Result{}, &Event{}, &MailLog{}, &Campaign{},
+		&Result{}, &Event{}, &MailLog{}, &Campaign{}, &Session{},
 	} {
 		if err := cleanup.Delete(model).Error; err != nil {
 			panic(err)

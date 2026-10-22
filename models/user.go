@@ -157,6 +157,11 @@ func DeleteUser(id int64) error {
 			return err
 		}
 	}
+	// Sign the user out everywhere
+	err = DeleteUserSessions(id, "")
+	if err != nil {
+		return err
+	}
 	// Finally, delete the user
 	err = db.Where("id=?", id).Delete(&User{}).Error
 	return err
