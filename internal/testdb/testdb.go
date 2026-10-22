@@ -16,7 +16,6 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/gophish/gophish/config"
@@ -31,25 +30,21 @@ type Fataler interface {
 // the MySQL database in its DSN.
 const MySQLDSNEnv = "GOPHISH_TEST_MYSQL_DSN"
 
-// Config returns the configuration for a fresh, empty test database. root is
-// the relative path from the calling package's directory to the repository
-// root, used to locate the migrations.
-func Config(f Fataler, root string) *config.Config {
+// Config returns the configuration for a fresh, empty test database.
+func Config(f Fataler) *config.Config {
 	dsn := os.Getenv(MySQLDSNEnv)
 	if dsn == "" {
 		return &config.Config{
-			DBName:         "sqlite3",
-			DBPath:         ":memory:",
-			MigrationsPath: filepath.Join(root, "db", "db_sqlite3", "migrations") + "/",
+			DBName: "sqlite3",
+			DBPath: ":memory:",
 		}
 	}
 	if err := resetMySQL(dsn); err != nil {
 		f.Fatalf("error resetting MySQL test database: %v", err)
 	}
 	return &config.Config{
-		DBName:         "mysql",
-		DBPath:         dsn,
-		MigrationsPath: filepath.Join(root, "db", "db_mysql", "migrations") + "/",
+		DBName: "mysql",
+		DBPath: dsn,
 	}
 }
 

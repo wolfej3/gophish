@@ -19,13 +19,14 @@ import (
 	mid "github.com/gophish/gophish/middleware"
 	"github.com/gophish/gophish/middleware/ratelimit"
 	"github.com/gophish/gophish/models"
+	"github.com/gophish/gophish/static"
+	templatefs "github.com/gophish/gophish/templates"
 	"github.com/gophish/gophish/util"
 	"github.com/gophish/gophish/worker"
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
-	"github.com/jordan-wright/unindexed"
 )
 
 // AdminServerOption is a functional option that is used to configure the
@@ -148,7 +149,7 @@ func (as *AdminServer) registerRoutes() {
 	router.PathPrefix("/api/").Handler(api)
 
 	// Setup static file serving
-	router.PathPrefix("/").Handler(http.FileServer(unindexed.Dir("./static/")))
+	router.PathPrefix("/").Handler(static.Handler())
 
 	// Setup CSRF Protection
 	csrfKey := []byte(as.config.CSRFKey)
@@ -323,7 +324,7 @@ func (as *AdminServer) handleInvalidLogin(w http.ResponseWriter, r *http.Request
 	params.Flashes = session.Flashes()
 	session.Save(r, w)
 	templates := template.New("template")
-	_, err := templates.ParseFiles("templates/login.html", "templates/flashes.html")
+	_, err := templates.ParseFS(templatefs.FS, "login.html", "flashes.html")
 	if err != nil {
 		log.Error(err)
 	}
@@ -372,7 +373,7 @@ func (as *AdminServer) Login(w http.ResponseWriter, r *http.Request) {
 		params.Flashes = session.Flashes()
 		session.Save(r, w)
 		templates := template.New("template")
-		_, err := templates.ParseFiles("templates/login.html", "templates/flashes.html")
+		_, err := templates.ParseFS(templatefs.FS, "login.html", "flashes.html")
 		if err != nil {
 			log.Error(err)
 		}
@@ -483,7 +484,7 @@ func (as *AdminServer) ResetPassword(w http.ResponseWriter, r *http.Request) {
 // TODO: Make this execute the template, too
 func getTemplate(w http.ResponseWriter, tmpl string) *template.Template {
 	templates := template.New("template")
-	_, err := templates.ParseFiles("templates/base.html", "templates/nav.html", "templates/"+tmpl+".html", "templates/flashes.html")
+	_, err := templates.ParseFS(templatefs.FS, "base.html", "nav.html", tmpl+".html", "flashes.html")
 	if err != nil {
 		log.Error(err)
 	}

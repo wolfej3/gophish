@@ -13,6 +13,7 @@ import (
 	mysql "github.com/go-sql-driver/mysql"
 	"github.com/gophish/gophish/auth"
 	"github.com/gophish/gophish/config"
+	migrations "github.com/gophish/gophish/db"
 	"github.com/pressly/goose/v3"
 	gormmysql "gorm.io/driver/mysql"
 	"gorm.io/driver/sqlite"
@@ -133,6 +134,7 @@ func Setup(c *config.Config) error {
 	// goose shares the goose_db_version table format with the goose fork we
 	// used previously, so existing databases keep their migration history.
 	goose.SetLogger(log.Logger)
+	goose.SetBaseFS(migrations.Migrations)
 	err := goose.SetDialect(gooseDialect)
 	if err != nil {
 		log.Error(err)
@@ -186,7 +188,7 @@ func Setup(c *config.Config) error {
 	}
 	sqlDB.SetMaxOpenConns(1)
 	// Migrate up to the latest version
-	err = goose.Up(sqlDB, conf.MigrationsPath)
+	err = goose.Up(sqlDB, migrations.MigrationsDir(gooseDialect))
 	if err != nil {
 		log.Error(err)
 		return err

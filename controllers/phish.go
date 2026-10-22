@@ -16,6 +16,7 @@ import (
 	"github.com/gophish/gophish/controllers/api"
 	log "github.com/gophish/gophish/logger"
 	"github.com/gophish/gophish/models"
+	"github.com/gophish/gophish/static"
 	"github.com/gophish/gophish/util"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
@@ -143,7 +144,7 @@ func (ps *PhishingServer) TrackHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	// Check for a preview
 	if _, ok := ctx.Get(r, "result").(models.EmailRequest); ok {
-		http.ServeFile(w, r, "static/images/pixel.png")
+		http.ServeFileFS(w, r, static.FS, "images/pixel.png")
 		return
 	}
 	rs := ctx.Get(r, "result").(models.Result)
@@ -160,7 +161,7 @@ func (ps *PhishingServer) TrackHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Error(err)
 	}
-	http.ServeFile(w, r, "static/images/pixel.png")
+	http.ServeFileFS(w, r, static.FS, "images/pixel.png")
 }
 
 // ReportHandler tracks emails as they are reported, updating the status for the given Result

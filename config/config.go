@@ -3,7 +3,6 @@ package config
 import (
 	"encoding/json"
 	"io/ioutil"
-	"path/filepath"
 
 	log "github.com/gophish/gophish/logger"
 )
@@ -34,7 +33,6 @@ type Config struct {
 	DBName         string      `json:"db_name"`
 	DBPath         string      `json:"db_path"`
 	DBSSLCaPath    string      `json:"db_sslca_path"`
-	MigrationsPath string      `json:"migrations_prefix"`
 	TestFlag       bool        `json:"test_flag"`
 	ContactAddress string      `json:"contact_address"`
 	Logging        *log.Config `json:"logging"`
@@ -61,10 +59,6 @@ func LoadConfig(configPath string) (*Config, error) {
 	if config.Logging == nil {
 		config.Logging = &log.Config{}
 	}
-	// Choosing the migrations directory based on the database used. goose
-	// only reads migrations from the exact directory it's given, so we point
-	// it at the migrations folder itself.
-	config.MigrationsPath = filepath.Join(config.MigrationsPath+config.DBName, "migrations")
 	// Explicitly set the TestFlag to false to prevent config.json overrides
 	config.TestFlag = false
 	return config, nil

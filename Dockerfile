@@ -14,6 +14,10 @@ FROM golang:1.26.10 AS build-golang
 
 WORKDIR /go/src/github.com/gophish/gophish
 COPY . .
+# The admin assets are embedded in the binary, so the freshly built bundles
+# must be in place before compiling.
+COPY --from=build-js /build/static/js/dist/ ./static/js/dist/
+COPY --from=build-js /build/static/css/dist/ ./static/css/dist/
 RUN go mod download && go build -v
 
 
@@ -28,10 +32,13 @@ RUN apt-get update && \
 	rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 WORKDIR /opt/gophish
-COPY --from=build-golang /go/src/github.com/gophish/gophish/ ./
-COPY --from=build-js /build/static/js/dist/ ./static/js/dist/
-COPY --from=build-js /build/static/css/dist/ ./static/css/dist/
+# Templates, admin assets, and migrations are embedded in the binary. Only the
+# files Gophish reads from disk at runtime are copied alongside it.
+COPY --from=build-golang /go/src/github.com/gophish/gophish/gophish ./
 COPY --from=build-golang /go/src/github.com/gophish/gophish/config.json ./
+COPY --from=build-golang /go/src/github.com/gophish/gophish/docker/ ./docker/
+COPY --from=build-golang /go/src/github.com/gophish/gophish/static/db/ ./static/db/
+COPY --from=build-golang /go/src/github.com/gophish/gophish/static/endpoint/ ./static/endpoint/
 RUN chown app. config.json
 
 RUN setcap 'cap_net_bind_service=+ep' /opt/gophish/gophish

@@ -18,6 +18,13 @@ Installation of Gophish is dead-simple - just download and extract the zip conta
 
 To build Gophish from source, simply run ```git clone https://github.com/gophish/gophish.git``` and ```cd``` into the project source directory. Then, run ```go build```. After this, you should have a binary called ```gophish``` in the current directory.
 
+The admin interface's HTML templates, CSS, JavaScript, fonts, and images, along with the database migrations, are embedded in the binary at build time. If you change any of them, rebuild with `go build` to see the change. If you change the JavaScript or CSS sources, run `gulp` first so the bundles in `static/js/dist` and `static/css/dist` are regenerated before they're embedded.
+
+Two things are still read from disk, relative to the directory Gophish runs in:
+
+- `static/endpoint/`: files you want the phishing server to host.
+- `static/db/geolite2-city.mmdb`: the GeoIP database used to map recipients' IP addresses to locations. If it's missing, Gophish still records events but skips the location lookup.
+
 ### Docker
 You can also use Gophish via the official Docker container [here](https://hub.docker.com/r/gophish/gophish/).
 

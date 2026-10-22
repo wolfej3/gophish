@@ -19,7 +19,7 @@ type ModelsSuite struct {
 var _ = check.Suite(&ModelsSuite{})
 
 func (s *ModelsSuite) SetUpSuite(c *check.C) {
-	conf := testdb.Config(c, "..")
+	conf := testdb.Config(c)
 	s.config = conf
 	err := Setup(conf)
 	if err != nil {
@@ -108,7 +108,7 @@ func (s *ModelsSuite) createCampaign(ch *check.C) Campaign {
 }
 
 func setupBenchmark(b *testing.B) {
-	conf := testdb.Config(b, "..")
+	conf := testdb.Config(b)
 	err := Setup(conf)
 	if err != nil {
 		b.Fatalf("Failed creating database: %v", err)

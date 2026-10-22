@@ -1,10 +1,7 @@
 package controllers
 
 import (
-	"fmt"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/gophish/gophish/auth"
@@ -19,15 +16,10 @@ type testContext struct {
 	config      *config.Config
 	adminServer *httptest.Server
 	phishServer *httptest.Server
-	origPath    string
 }
 
 func setupTest(t *testing.T) *testContext {
-	wd, _ := os.Getwd()
-	fmt.Println(wd)
-	conf := testdb.Config(t, "..")
-	abs, _ := filepath.Abs("../db/db_sqlite3/migrations/")
-	fmt.Printf("in controllers_test.go: %s\n", abs)
+	conf := testdb.Config(t)
 	err := models.Setup(conf)
 	if err != nil {
 		t.Fatalf("error setting up database: %v", err)
@@ -62,14 +54,6 @@ func setupTest(t *testing.T) *testContext {
 	ctx.phishServer = httptest.NewUnstartedServer(NewPhishingServer(ctx.config.PhishConf).server.Handler)
 	ctx.phishServer.Config.Addr = ctx.config.PhishConf.ListenURL
 	ctx.phishServer.Start()
-	// Move our cwd up to the project root for help with resolving
-	// static assets
-	origPath, _ := os.Getwd()
-	ctx.origPath = origPath
-	err = os.Chdir("../")
-	if err != nil {
-		t.Fatalf("error changing directories to setup asset discovery: %v", err)
-	}
 	createTestData(t)
 	return ctx
 }
@@ -78,8 +62,6 @@ func tearDown(t *testing.T, ctx *testContext) {
 	// Tear down the admin and phishing servers
 	ctx.adminServer.Close()
 	ctx.phishServer.Close()
-	// Reset the path for the next test
-	os.Chdir(ctx.origPath)
 }
 
 func createTestData(t *testing.T) {

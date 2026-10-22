@@ -12,6 +12,7 @@ import (
 
 	"github.com/gophish/gophish/config"
 	"github.com/gophish/gophish/models"
+	"github.com/gophish/gophish/static"
 )
 
 func getFirstCampaign(t *testing.T) models.Campaign {
@@ -52,7 +53,7 @@ func openEmail(t *testing.T, ctx *testContext, rid string) {
 	if err != nil {
 		t.Fatalf("error reading response body from /track endpoint: %v", err)
 	}
-	expected, err := ioutil.ReadFile("static/images/pixel.png")
+	expected, err := static.FS.ReadFile("images/pixel.png")
 	if err != nil {
 		t.Fatalf("error reading local transparent pixel: %v", err)
 	}

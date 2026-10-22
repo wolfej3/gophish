@@ -26,8 +26,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 import (
+	_ "embed"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/signal"
@@ -57,14 +57,13 @@ var (
 			Default("all").Enum(modeAll, modeAdmin, modePhish)
 )
 
-func main() {
-	// Load the version
+// version is the Gophish version, embedded from the VERSION file at build time.
+//
+//go:embed VERSION
+var version string
 
-	version, err := ioutil.ReadFile("./VERSION")
-	if err != nil {
-		log.Fatal(err)
-	}
-	kingpin.Version(string(version))
+func main() {
+	kingpin.Version(version)
 
 	// Parse the CLI flags and load the config
 	kingpin.CommandLine.HelpFlag.Short('h')
@@ -80,7 +79,7 @@ func main() {
 		log.Warnf("No contact address has been configured.")
 		log.Warnf("Please consider adding a contact_address entry in your config.json")
 	}
-	config.Version = string(version)
+	config.Version = version
 
 	// Configure our various upstream clients to make sure that we restrict
 	// outbound connections as needed.

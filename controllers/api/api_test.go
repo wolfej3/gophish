@@ -21,7 +21,7 @@ type testContext struct {
 }
 
 func setupTest(t *testing.T) *testContext {
-	conf := testdb.Config(t, "../..")
+	conf := testdb.Config(t)
 	err := models.Setup(conf)
 	if err != nil {
 		t.Fatalf("Failed creating database: %v", err)
