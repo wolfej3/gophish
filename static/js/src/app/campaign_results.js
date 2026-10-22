@@ -267,7 +267,9 @@ function replay(event_idx) {
         inputValue: url || "",
         inputValidator: function (value) {
             return new Promise(function (resolve, reject) {
-                if (value) {
+                // The URL may come from the submitted (attacker-controllable)
+                // payload, so only allow http(s) to avoid javascript: URLs.
+                if (value && /^https?:\/\//i.test(value)) {
                     resolve();
                 } else {
                     reject('Invalid URL.');
@@ -284,6 +286,9 @@ function replay(event_idx) {
     submitForm()
 
     function submitForm() {
+        if (!/^https?:\/\//i.test(url)) {
+            return
+        }
         form.attr({
             action: url
         })
@@ -357,7 +362,7 @@ var renderDevice = function (event_details) {
 
     var browserString = '<div class="timeline-device-browser"><span class="fa fa-stack">' +
         '<i class="fa fa-' + escapeHtml(browserIcon) + ' fa-stack-1x"></i></span> ' +
-        deviceBrowser + ' ' + browserVersion + '</div>'
+        escapeHtml(deviceBrowser) + ' ' + escapeHtml(browserVersion) + '</div>'
 
     detailsString += browserString
     detailsString += '</div>'
@@ -422,7 +427,7 @@ function renderTimeline(data) {
                 if (details.error) {
                     results += '<div class="timeline-event-details"><i class="fa fa-caret-right"></i> View Details</div>'
                     results += '<div class="timeline-event-results">'
-                    results += '<span class="label label-default">Error</span> ' + details.error
+                    results += '<span class="label label-default">Error</span> ' + escapeHtml(details.error)
                     results += '</div>'
                 }
             }

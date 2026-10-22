@@ -57,7 +57,9 @@ func GetContext(handler http.Handler) http.HandlerFunc {
 		r = ctx.Set(r, "session", session)
 		if id, ok := session.Values["id"]; ok {
 			u, err := models.GetUser(id.(int64))
-			if err != nil {
+			// Locked accounts shouldn't be able to keep using a session
+			// that was created before the lock was applied.
+			if err != nil || u.AccountLocked {
 				r = ctx.Set(r, "user", nil)
 			} else {
 				r = ctx.Set(r, "user", u)
@@ -100,6 +102,10 @@ func RequireAPIKey(handler http.Handler) http.Handler {
 		u, err := models.GetUserByAPIKey(ak)
 		if err != nil {
 			JSONError(w, http.StatusUnauthorized, "Invalid API Key")
+			return
+		}
+		if u.AccountLocked {
+			JSONError(w, http.StatusUnauthorized, "Account Locked")
 			return
 		}
 		r = ctx.Set(r, "user", u)

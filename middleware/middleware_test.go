@@ -175,6 +175,27 @@ func TestBearerToken(t *testing.T) {
 	}
 }
 
+func TestLockedAccountAPIKey(t *testing.T) {
+	testCtx := setupTest(t)
+	u, err := models.GetUser(1)
+	if err != nil {
+		t.Fatalf("error getting user: %v", err)
+	}
+	u.AccountLocked = true
+	if err = models.PutUser(&u); err != nil {
+		t.Fatalf("error locking user: %v", err)
+	}
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", testCtx.apiKey))
+	response := httptest.NewRecorder()
+	RequireAPIKey(successHandler).ServeHTTP(response, req)
+	expected := http.StatusUnauthorized
+	got := response.Code
+	if got != expected {
+		t.Fatalf("incorrect status code received. expected %d got %d", expected, got)
+	}
+}
+
 func TestPasswordResetRequired(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req = ctx.Set(req, "user", models.User{

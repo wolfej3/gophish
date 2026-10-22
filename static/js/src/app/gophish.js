@@ -50,7 +50,11 @@ function query(endpoint, method, data, async) {
 }
 
 function escapeHtml(text) {
+    // jQuery's .html() doesn't escape quotes, so we handle them explicitly
+    // to keep escaped values safe inside HTML attributes.
     return $("<div/>").text(text).html()
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;")
 }
 window.escapeHtml = escapeHtml
 

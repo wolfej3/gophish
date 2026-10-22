@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"net/http"
 	"strings"
 
@@ -68,6 +69,8 @@ func (as *Server) ImportEmail(w http.ResponseWriter, r *http.Request) {
 	e, err := email.NewEmailFromReader(strings.NewReader(ir.Content))
 	if err != nil {
 		log.Error(err)
+		JSONResponse(w, models.Response{Success: false, Message: "Error parsing email"}, http.StatusBadRequest)
+		return
 	}
 	// If the user wants to convert links to point to
 	// the landing page, let's make it happen by changing up
@@ -135,7 +138,7 @@ func (as *Server) ImportSite(w http.ResponseWriter, r *http.Request) {
 	}
 	// Assuming we don't want to include resources, we'll need a base href
 	if d.Find("head base").Length() == 0 {
-		d.Find("head").PrependHtml(fmt.Sprintf("<base href=\"%s\">", cr.URL))
+		d.Find("head").PrependHtml(fmt.Sprintf("<base href=\"%s\">", html.EscapeString(cr.URL)))
 	}
 	forms := d.Find("form")
 	forms.Each(func(i int, f *goquery.Selection) {
@@ -145,7 +148,7 @@ func (as *Server) ImportSite(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(url, "http") {
 			url = fmt.Sprintf("%s%s", cr.URL, url)
 		}
-		f.PrependHtml(fmt.Sprintf("<input type=\"hidden\" name=\"__original_url\" value=\"%s\"/>", url))
+		f.PrependHtml(fmt.Sprintf("<input type=\"hidden\" name=\"__original_url\" value=\"%s\"/>", html.EscapeString(url)))
 	})
 	h, err := d.Html()
 	if err != nil {
