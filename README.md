@@ -14,7 +14,7 @@ Gophish: Open-Source Phishing Toolkit
 Installation of Gophish is dead-simple - just download and extract the zip containing the [release for your system](https://github.com/gophish/gophish/releases/), and run the binary. Gophish has binary releases for Windows, Mac, and Linux platforms.
 
 ### Building From Source
-**If you are building from source, please note that Gophish requires Go v1.10 or above!**
+**If you are building from source, please note that Gophish requires Go v1.26 or above!** With Go's default toolchain settings, `go build` downloads the exact Go release pinned in `go.mod` automatically.
 
 To build Gophish from source, simply run ```git clone https://github.com/gophish/gophish.git``` and ```cd``` into the project source directory. Then, run ```go build```. After this, you should have a binary called ```gophish``` in the current directory.
 
@@ -29,6 +29,21 @@ time="2020-07-29T01:24:08Z" level=info msg="Please login with the username admin
 ```
 
 Releases of Gophish prior to v0.10.1 have a default username of `admin` and password of `gophish`.
+
+### Admin Server TLS
+
+The admin interface must be reached over HTTPS. Its CSRF protection rejects logins and other form submissions from plain `http://` pages, so an admin server reached over plain HTTP will show the login page but refuse every login with a `403 Forbidden` error.
+
+There are two supported setups:
+
+- **Built-in TLS (the default).** Keep `"use_tls": true` in the `admin_server` section of `config.json`. Gophish generates a self-signed certificate on first run, or you can point `cert_path` and `key_path` at your own certificate.
+- **A TLS-terminating reverse proxy.** Set `"use_tls": false` and put a proxy such as nginx or Caddy in front of Gophish, serving the admin interface to browsers over HTTPS. Gophish logs a warning at startup when TLS is off as a reminder that it must sit behind such a proxy.
+
+If you access the admin interface through a different hostname than the one the request arrives with (for example, a proxy that rewrites the `Host` header), add the browser-facing host to `trusted_origins`. Entries are host names with an optional port and no scheme, e.g. `["gophish.example.com"]` or `["gophish.example.com:8443"]`. Only list hosts you control: the CSRF library doesn't check the scheme of trusted origins ([GO-2025-3884](https://pkg.go.dev/vuln/GO-2025-3884), no upstream fix yet), so each entry should only ever serve Gophish over HTTPS.
+
+In Docker, the admin server uses built-in TLS unless `ADMIN_USE_TLS=false` is set.
+
+This applies only to the admin server. The phishing server's `use_tls` setting is unaffected.
 
 ### Documentation
 

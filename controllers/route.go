@@ -106,7 +106,10 @@ func (as *AdminServer) Start() {
 		log.Infof("Starting admin server at https://%s", as.config.ListenURL)
 		log.Fatal(as.server.ListenAndServeTLS(as.config.CertPath, as.config.KeyPath))
 	}
-	// If TLS isn't configured, just listen on HTTP
+	// If TLS isn't configured, just listen on HTTP. Browsers must still reach
+	// the admin server over HTTPS (via a TLS-terminating proxy), since CSRF
+	// protection rejects form submissions from plain HTTP pages.
+	log.Warn("The admin server is running without TLS. Logins and other form submissions will fail unless it's served through a TLS-terminating proxy. Set \"use_tls\": true in the admin_server config to use Gophish's built-in TLS.")
 	log.Infof("Starting admin server at http://%s", as.config.ListenURL)
 	log.Fatal(as.server.ListenAndServe())
 }

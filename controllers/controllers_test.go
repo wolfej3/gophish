@@ -37,9 +37,12 @@ func setupTest(t *testing.T) *testContext {
 	}
 	ctx := &testContext{}
 	ctx.config = conf
+	// The admin server requires TLS (or a TLS-terminating proxy), so we test
+	// it over HTTPS the same way browsers will reach it.
+	ctx.config.AdminConf.UseTLS = true
 	ctx.adminServer = httptest.NewUnstartedServer(NewAdminServer(ctx.config.AdminConf).server.Handler)
 	ctx.adminServer.Config.Addr = ctx.config.AdminConf.ListenURL
-	ctx.adminServer.Start()
+	ctx.adminServer.StartTLS()
 	// Get the API key to use for these tests
 	u, err := models.GetUser(1)
 	// Reset the temporary password for the admin user to a value we control

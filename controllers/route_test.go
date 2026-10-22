@@ -10,8 +10,10 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-func attemptLogin(t *testing.T, ctx *testContext, client *http.Client, username, password, optionalPath string) *http.Response {
-	resp, err := http.Get(fmt.Sprintf("%s/login", ctx.adminServer.URL))
+// getLoginToken fetches the login page, returning the response (which carries
+// the CSRF cookie) and the CSRF token embedded in the form.
+func getLoginToken(t *testing.T, ctx *testContext) (*http.Response, string) {
+	resp, err := ctx.adminServer.Client().Get(fmt.Sprintf("%s/login", ctx.adminServer.URL))
 	if err != nil {
 		t.Fatalf("error requesting the /login endpoint: %v", err)
 	}
@@ -30,10 +32,12 @@ func attemptLogin(t *testing.T, ctx *testContext, client *http.Client, username,
 	if !ok {
 		t.Fatal("unable to find csrf_token value in login response")
 	}
-	if client == nil {
-		client = &http.Client{}
-	}
+	return resp, token
+}
 
+// newLoginRequest builds a login form submission with the provided Referer,
+// mirroring what a browser sends when submitting the login page.
+func newLoginRequest(t *testing.T, ctx *testContext, resp *http.Response, token, username, password, optionalPath, referer string) *http.Request {
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/login%s", ctx.adminServer.URL, optionalPath), strings.NewReader(url.Values{
 		"username":   {username},
 		"password":   {password},
@@ -45,18 +49,52 @@ func attemptLogin(t *testing.T, ctx *testContext, client *http.Client, username,
 
 	req.Header.Set("Cookie", resp.Header.Get("Set-Cookie"))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	if referer != "" {
+		req.Header.Set("Referer", referer)
+	}
+	return req
+}
 
-	resp, err = client.Do(req)
+func attemptLogin(t *testing.T, ctx *testContext, client *http.Client, username, password, optionalPath string) *http.Response {
+	resp, token := getLoginToken(t, ctx)
+	if client == nil {
+		client = ctx.adminServer.Client()
+	}
+	req := newLoginRequest(t, ctx, resp, token, username, password, optionalPath, fmt.Sprintf("%s/login", ctx.adminServer.URL))
+	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("error requesting the /login endpoint: %v", err)
 	}
 	return resp
 }
 
+func TestLoginRefererRequired(t *testing.T) {
+	ctx := setupTest(t)
+	defer tearDown(t, ctx)
+	referers := map[string]string{
+		"missing":      "",
+		"cross-origin": "https://evil.example.com/login",
+		"plain http":   strings.Replace(ctx.adminServer.URL, "https://", "http://", 1) + "/login",
+	}
+	for name, referer := range referers {
+		resp, token := getLoginToken(t, ctx)
+		req := newLoginRequest(t, ctx, resp, token, "admin", "gophish", "", referer)
+		resp, err := ctx.adminServer.Client().Do(req)
+		if err != nil {
+			t.Fatalf("error requesting the /login endpoint: %v", err)
+		}
+		got := resp.StatusCode
+		expected := http.StatusForbidden
+		if got != expected {
+			t.Fatalf("%s referer: invalid status code received. expected %d got %d", name, expected, got)
+		}
+	}
+}
+
 func TestLoginCSRF(t *testing.T) {
 	ctx := setupTest(t)
 	defer tearDown(t, ctx)
-	resp, err := http.PostForm(fmt.Sprintf("%s/login", ctx.adminServer.URL),
+	resp, err := ctx.adminServer.Client().PostForm(fmt.Sprintf("%s/login", ctx.adminServer.URL),
 		url.Values{
 			"username": {"admin"},
 			"password": {"gophish"},
@@ -100,6 +138,7 @@ func TestSuccessfulRedirect(t *testing.T) {
 	defer tearDown(t, ctx)
 	next := "/campaigns"
 	client := &http.Client{
+		Transport: ctx.adminServer.Client().Transport,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		}}
