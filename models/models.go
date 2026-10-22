@@ -10,15 +10,16 @@ import (
 	"os"
 	"time"
 
-	"bitbucket.org/liamstask/goose/lib/goose"
-
 	mysql "github.com/go-sql-driver/mysql"
 	"github.com/gophish/gophish/auth"
 	"github.com/gophish/gophish/config"
+	"github.com/pressly/goose/v3"
+	gormmysql "gorm.io/driver/mysql"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 
 	log "github.com/gophish/gophish/logger"
-	"github.com/jinzhu/gorm"
-	_ "github.com/mattn/go-sqlite3" // Blank import needed to import sqlite3
 )
 
 var db *gorm.DB
@@ -81,21 +82,16 @@ func generateSecureKey() string {
 	return fmt.Sprintf("%x", k)
 }
 
-func chooseDBDriver(name, openStr string) goose.DBDriver {
-	d := goose.DBDriver{Name: name, OpenStr: openStr}
-
+// chooseDialector returns the gorm dialector for the configured database,
+// along with the matching goose dialect used to run migrations.
+func chooseDialector(name, dsn string) (gorm.Dialector, string) {
 	switch name {
 	case "mysql":
-		d.Import = "github.com/go-sql-driver/mysql"
-		d.Dialect = &goose.MySqlDialect{}
-
+		return gormmysql.Open(dsn), "mysql"
 	// Default database is sqlite3
 	default:
-		d.Import = "github.com/mattn/go-sqlite3"
-		d.Dialect = &goose.Sqlite3Dialect{}
+		return sqlite.Open(dsn), "sqlite3"
 	}
-
-	return d
 }
 
 func createTemporaryPassword(u *User) error {
@@ -115,7 +111,7 @@ func createTemporaryPassword(u *User) error {
 	// Anytime a temporary password is created, we will force the user
 	// to change their password
 	u.PasswordChangeRequired = true
-	err = db.Save(u).Error
+	err = db.Omit("Role").Save(u).Error
 	if err != nil {
 		return err
 	}
@@ -133,14 +129,11 @@ func createTemporaryPassword(u *User) error {
 func Setup(c *config.Config) error {
 	// Setup the package-scoped config
 	conf = c
-	// Setup the goose configuration
-	migrateConf := &goose.DBConf{
-		MigrationsDir: conf.MigrationsPath,
-		Env:           "production",
-		Driver:        chooseDBDriver(conf.DBName, conf.DBPath),
-	}
-	// Get the latest possible migration
-	latest, err := goose.GetMostRecentDBVersion(migrateConf.MigrationsDir)
+	dialector, gooseDialect := chooseDialector(conf.DBName, conf.DBPath)
+	// goose shares the goose_db_version table format with the goose fork we
+	// used previously, so existing databases keep their migration history.
+	goose.SetLogger(log.Logger)
+	err := goose.SetDialect(gooseDialect)
 	if err != nil {
 		log.Error(err)
 		return err
@@ -172,7 +165,9 @@ func Setup(c *config.Config) error {
 	// Open our database connection
 	i := 0
 	for {
-		db, err = gorm.Open(conf.DBName, conf.DBPath)
+		db, err = gorm.Open(dialector, &gorm.Config{
+			Logger: gormlogger.Default.LogMode(gormlogger.Silent),
+		})
 		if err == nil {
 			break
 		}
@@ -184,15 +179,14 @@ func Setup(c *config.Config) error {
 		log.Warn("waiting for database to be up...")
 		time.Sleep(5 * time.Second)
 	}
-	db.LogMode(false)
-	db.SetLogger(log.Logger)
-	db.DB().SetMaxOpenConns(1)
+	sqlDB, err := db.DB()
 	if err != nil {
 		log.Error(err)
 		return err
 	}
+	sqlDB.SetMaxOpenConns(1)
 	// Migrate up to the latest version
-	err = goose.RunMigrationsOnDb(migrateConf, migrateConf.MigrationsDir, latest, db.DB())
+	err = goose.Up(sqlDB, conf.MigrationsPath)
 	if err != nil {
 		log.Error(err)
 		return err
@@ -220,7 +214,7 @@ func Setup(c *config.Config) error {
 			adminUser.ApiKey = auth.GenerateSecureKey(auth.APIKeyLength)
 		}
 
-		err = db.Save(&adminUser).Error
+		err = db.Omit("Role").Save(&adminUser).Error
 		if err != nil {
 			log.Error(err)
 			return err

@@ -5,6 +5,7 @@ import (
 
 	"github.com/gophish/gophish/config"
 	"gopkg.in/check.v1"
+	"gorm.io/gorm"
 )
 
 // Hook up gocheck into the "go test" runner.
@@ -32,18 +33,23 @@ func (s *ModelsSuite) SetUpSuite(c *check.C) {
 func (s *ModelsSuite) TearDownTest(c *check.C) {
 	// Clear database tables between each test. If new tables are
 	// used in this test suite they will need to be cleaned up here.
-	db.Delete(Group{})
-	db.Delete(Target{})
-	db.Delete(GroupTarget{})
-	db.Delete(SMTP{})
-	db.Delete(Page{})
-	db.Delete(Result{})
-	db.Delete(MailLog{})
-	db.Delete(Campaign{})
+	cleanup := db.Session(&gorm.Session{AllowGlobalUpdate: true})
+	for _, model := range []interface{}{
+		&Group{}, &Target{}, &GroupTarget{}, &SMTP{}, &Header{}, &Page{}, &Template{}, &Attachment{},
+		&Result{}, &Event{}, &MailLog{}, &Campaign{},
+	} {
+		if err := cleanup.Delete(model).Error; err != nil {
+			panic(err)
+		}
+	}
 
 	// Reset users table to default state.
-	db.Not("id", 1).Delete(User{})
-	db.Model(User{}).Update("username", "admin")
+	if err := db.Where("id <> ?", 1).Delete(&User{}).Error; err != nil {
+		panic(err)
+	}
+	if err := db.Model(&User{}).Where("id = ?", 1).Update("username", "admin").Error; err != nil {
+		panic(err)
+	}
 }
 
 func (s *ModelsSuite) createCampaignDependencies(ch *check.C, optional ...string) Campaign {
@@ -117,23 +123,32 @@ func setupBenchmark(b *testing.B) {
 }
 
 func tearDownBenchmark(b *testing.B) {
-	err := db.Close()
+	sqlDB, err := db.DB()
+	if err != nil {
+		b.Fatalf("error getting database handle: %v", err)
+	}
+	err = sqlDB.Close()
 	if err != nil {
 		b.Fatalf("error closing database: %v", err)
 	}
 }
 
 func resetBenchmark(b *testing.B) {
-	db.Delete(Group{})
-	db.Delete(Target{})
-	db.Delete(GroupTarget{})
-	db.Delete(SMTP{})
-	db.Delete(Page{})
-	db.Delete(Result{})
-	db.Delete(MailLog{})
-	db.Delete(Campaign{})
+	cleanup := db.Session(&gorm.Session{AllowGlobalUpdate: true})
+	for _, model := range []interface{}{
+		&Group{}, &Target{}, &GroupTarget{}, &SMTP{}, &Header{}, &Page{}, &Template{}, &Attachment{},
+		&Result{}, &Event{}, &MailLog{}, &Campaign{},
+	} {
+		if err := cleanup.Delete(model).Error; err != nil {
+			panic(err)
+		}
+	}
 
 	// Reset users table to default state.
-	db.Not("id", 1).Delete(User{})
-	db.Model(User{}).Update("username", "admin")
+	if err := db.Where("id <> ?", 1).Delete(&User{}).Error; err != nil {
+		panic(err)
+	}
+	if err := db.Model(&User{}).Where("id = ?", 1).Update("username", "admin").Error; err != nil {
+		panic(err)
+	}
 }

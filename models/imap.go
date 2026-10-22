@@ -103,8 +103,7 @@ func (im *IMAP) Validate() error {
 // GetIMAP returns the IMAP server owned by the given user.
 func GetIMAP(uid int64) ([]IMAP, error) {
 	im := []IMAP{}
-	count := 0
-	err := db.Where("user_id=?", uid).Find(&im).Count(&count).Error
+	err := db.Where("user_id=?", uid).Find(&im).Error
 
 	if err != nil {
 		log.Error(err)
@@ -128,8 +127,9 @@ func PostIMAP(im *IMAP, uid int64) error {
 		return err
 	}
 
-	// Insert new settings into the DB
-	err = db.Save(im).Error
+	// Insert new settings into the DB. IMAP settings have no primary key, so
+	// we always create a fresh row after deleting the old one above.
+	err = db.Create(im).Error
 	if err != nil {
 		log.Error("Unable to save to database: ", err.Error())
 	}

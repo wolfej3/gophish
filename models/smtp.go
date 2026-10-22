@@ -14,7 +14,7 @@ import (
 	"github.com/gophish/gophish/dialer"
 	log "github.com/gophish/gophish/logger"
 	"github.com/gophish/gophish/mailer"
-	"github.com/jinzhu/gorm"
+	"gorm.io/gorm"
 )
 
 // Dialer is a wrapper around a standard gomail.Dialer in order
@@ -159,7 +159,7 @@ func GetSMTPs(uid int64) ([]SMTP, error) {
 // GetSMTP returns the SMTP, if it exists, specified by the given id and user_id.
 func GetSMTP(id int64, uid int64) (SMTP, error) {
 	s := SMTP{}
-	err := db.Where("user_id=? and id=?", uid, id).Find(&s).Error
+	err := db.Where("user_id=? and id=?", uid, id).Take(&s).Error
 	if err != nil {
 		log.Error(err)
 		return s, err
@@ -175,7 +175,7 @@ func GetSMTP(id int64, uid int64) (SMTP, error) {
 // GetSMTPByName returns the SMTP, if it exists, specified by the given name and user_id.
 func GetSMTPByName(n string, uid int64) (SMTP, error) {
 	s := SMTP{}
-	err := db.Where("user_id=? and name=?", uid, n).Find(&s).Error
+	err := db.Where("user_id=? and name=?", uid, n).Take(&s).Error
 	if err != nil {
 		log.Error(err)
 		return s, err
@@ -250,7 +250,7 @@ func DeleteSMTP(id int64, uid int64) error {
 		log.Error(err)
 		return err
 	}
-	err = db.Where("user_id=?", uid).Delete(SMTP{Id: id}).Error
+	err = db.Where("user_id=?", uid).Delete(&SMTP{Id: id}).Error
 	if err != nil {
 		log.Error(err)
 	}

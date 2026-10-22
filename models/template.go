@@ -6,7 +6,7 @@ import (
 	"time"
 
 	log "github.com/gophish/gophish/logger"
-	"github.com/jinzhu/gorm"
+	"gorm.io/gorm"
 )
 
 // Template models hold the attributes for an email template to be sent to targets
@@ -81,7 +81,7 @@ func GetTemplates(uid int64) ([]Template, error) {
 // GetTemplate returns the template, if it exists, specified by the given id and user_id.
 func GetTemplate(id int64, uid int64) (Template, error) {
 	t := Template{}
-	err := db.Where("user_id=? and id=?", uid, id).Find(&t).Error
+	err := db.Where("user_id=? and id=?", uid, id).Take(&t).Error
 	if err != nil {
 		log.Error(err)
 		return t, err
@@ -102,7 +102,7 @@ func GetTemplate(id int64, uid int64) (Template, error) {
 // GetTemplateByName returns the template, if it exists, specified by the given name and user_id.
 func GetTemplateByName(n string, uid int64) (Template, error) {
 	t := Template{}
-	err := db.Where("user_id=? and name=?", uid, n).Find(&t).Error
+	err := db.Where("user_id=? and name=?", uid, n).Take(&t).Error
 	if err != nil {
 		log.Error(err)
 		return t, err
@@ -188,7 +188,7 @@ func DeleteTemplate(id int64, uid int64) error {
 	}
 
 	// Finally, delete the template itself
-	err = db.Where("user_id=?", uid).Delete(Template{Id: id}).Error
+	err = db.Where("user_id=?", uid).Delete(&Template{Id: id}).Error
 	if err != nil {
 		log.Error(err)
 		return err

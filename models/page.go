@@ -102,7 +102,7 @@ func GetPages(uid int64) ([]Page, error) {
 // GetPage returns the page, if it exists, specified by the given id and user_id.
 func GetPage(id int64, uid int64) (Page, error) {
 	p := Page{}
-	err := db.Where("user_id=? and id=?", uid, id).Find(&p).Error
+	err := db.Where("user_id=? and id=?", uid, id).Take(&p).Error
 	if err != nil {
 		log.Error(err)
 	}
@@ -112,7 +112,7 @@ func GetPage(id int64, uid int64) (Page, error) {
 // GetPageByName returns the page, if it exists, specified by the given name and user_id.
 func GetPageByName(n string, uid int64) (Page, error) {
 	p := Page{}
-	err := db.Where("user_id=? and name=?", uid, n).Find(&p).Error
+	err := db.Where("user_id=? and name=?", uid, n).Take(&p).Error
 	if err != nil {
 		log.Error(err)
 	}
@@ -151,7 +151,7 @@ func PutPage(p *Page) error {
 // DeletePage deletes an existing page in the database.
 // An error is returned if a page with the given user id and page id is not found.
 func DeletePage(id int64, uid int64) error {
-	err := db.Where("user_id=?", uid).Delete(Page{Id: id}).Error
+	err := db.Where("user_id=?", uid).Delete(&Page{Id: id}).Error
 	if err != nil {
 		log.Error(err)
 	}
