@@ -59,6 +59,7 @@ var vendorScripts = []string{
 // plain scripts whose top-level functions are called from the templates
 // (for example, in onclick handlers), so they're not wrapped or bundled.
 var appScripts = []string{
+	"audit_log.js",
 	"autocomplete.js",
 	"campaign_results.js",
 	"campaigns.js",

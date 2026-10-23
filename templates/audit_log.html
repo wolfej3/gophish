@@ -1,0 +1,55 @@
+{{define "body"}}
+<div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
+    <h1 class="page-header">
+        {{.Title}}
+    </h1>
+    <div id="flashes" class="row"></div>
+    <form class="row form-inline" id="auditFilterForm">
+        <div class="form-group">
+            <label for="audit_username">Username</label>
+            <input type="text" class="form-control" id="audit_username" placeholder="Any user" />
+        </div>
+        <div class="form-group">
+            <label for="audit_action">Action</label>
+            <select class="form-control" id="audit_action">
+                <option value="">Any action</option>
+                <option value="login">Login</option>
+                <option value="login_failed">Failed login</option>
+                <option value="logout">Logout</option>
+                <option value="password_changed">Password changed</option>
+                <option value="2fa_enabled">Two-factor turned on</option>
+                <option value="2fa_disabled">Two-factor turned off</option>
+                <option value="recovery_codes_regenerated">Recovery codes regenerated</option>
+                <option value="impersonate">Impersonation</option>
+                <option value="api_request">Change</option>
+                <option value="api_request_failed">Failed change</option>
+                <option value="api_request_denied">Denied change</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary"><i class="fa fa-filter"></i> Filter</button>
+    </form>
+    &nbsp;
+    <div id="loading">
+        <i class="fa fa-spinner fa-spin fa-4x"></i>
+    </div>
+    <div class="row">
+        <table id="auditTable" class="table table-condensed" style="display:none;">
+            <thead>
+                <tr>
+                    <th class="col-md-2">Time</th>
+                    <th class="col-md-1">User</th>
+                    <th class="col-md-2">Action</th>
+                    <th class="col-md-3">Target</th>
+                    <th class="col-md-3">Details</th>
+                    <th class="col-md-1">IP Address</th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+        <button type="button" class="btn btn-default hidden" id="auditOlder">Load older entries</button>
+    </div>
+</div>
+{{end}} {{define "scripts"}}
+<script src="/js/dist/app/audit_log.min.js"></script>
+{{end}}

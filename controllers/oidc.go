@@ -15,6 +15,7 @@ import (
 	"github.com/gophish/gophish/config"
 	ctx "github.com/gophish/gophish/context"
 	log "github.com/gophish/gophish/logger"
+	mid "github.com/gophish/gophish/middleware"
 	"github.com/gophish/gophish/models"
 	"github.com/gorilla/sessions"
 	"golang.org/x/oauth2"
@@ -117,6 +118,7 @@ func (as *AdminServer) passwordLoginDisabled() bool {
 // login page.
 func (as *AdminServer) ssoError(w http.ResponseWriter, r *http.Request, err error) {
 	log.Errorf("single sign-on failed: %v", err)
+	mid.Audit(r, nil, "", models.AuditLoginFailed, "", "single sign-on: "+err.Error())
 	session := ctx.Get(r, "session").(*sessions.Session)
 	for _, k := range []string{oidcStateKey, oidcNonceKey, oidcVerifierKey, oidcNextKey} {
 		delete(session.Values, k)
@@ -223,10 +225,10 @@ func (as *AdminServer) OIDCCallback(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if u.TOTPEnabled {
-		as.startSecondFactor(w, r, u, next)
+		as.startSecondFactor(w, r, u, next, "single sign-on")
 		return
 	}
-	as.completeLogin(w, r, u, next)
+	as.completeLogin(w, r, u, next, "single sign-on")
 }
 
 // oidcUser returns the Gophish account for a verified ID token. Accounts are

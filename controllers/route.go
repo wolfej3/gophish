@@ -164,6 +164,7 @@ func (as *AdminServer) registerRoutes() {
 	router.HandleFunc("/settings/2fa/recovery_codes", mid.Use(as.RegenerateRecoveryCodes, as.limiter.Limit, mid.RequireLogin))
 	router.HandleFunc("/users", mid.Use(as.UserManagement, mid.RequirePermission(models.PermissionModifySystem), mid.RequireLogin))
 	router.HandleFunc("/webhooks", mid.Use(as.Webhooks, mid.RequirePermission(models.PermissionModifySystem), mid.RequireLogin))
+	router.HandleFunc("/audit_log", mid.Use(as.AuditLog, mid.RequirePermission(models.PermissionModifySystem), mid.RequireLogin))
 	router.HandleFunc("/impersonate", mid.Use(as.Impersonate, mid.RequirePermission(models.PermissionModifySystem), mid.RequireLogin))
 	// Create the API routes
 	api := api.NewServer(
@@ -316,6 +317,7 @@ func (as *AdminServer) Settings(w http.ResponseWriter, r *http.Request) {
 		if err = mid.RevokeOtherSessions(r, u.Id); err != nil {
 			log.Error(err)
 		}
+		mid.Audit(r, &u, "", models.AuditPasswordChanged, "", "settings")
 		api.JSONResponse(w, msg, http.StatusOK)
 	}
 }
@@ -397,6 +399,13 @@ func (as *AdminServer) Webhooks(w http.ResponseWriter, r *http.Request) {
 	getTemplate(w, "webhooks").ExecuteTemplate(w, "base", params)
 }
 
+// AuditLog is an admin-only handler that shows the audit log
+func (as *AdminServer) AuditLog(w http.ResponseWriter, r *http.Request) {
+	params := newTemplateParams(r)
+	params.Title = "Audit Log"
+	getTemplate(w, "audit_log").ExecuteTemplate(w, "base", params)
+}
+
 // Impersonate allows an admin to login to a user account without needing the password
 func (as *AdminServer) Impersonate(w http.ResponseWriter, r *http.Request) {
 
@@ -415,6 +424,12 @@ func (as *AdminServer) Impersonate(w http.ResponseWriter, r *http.Request) {
 			log.Error(err)
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
+		}
+		mid.AuditUser(r, models.AuditImpersonate, u.Username, "")
+		// Remember who is really acting, for the audit log. If they're
+		// already impersonating someone, keep the original account.
+		if _, ok := session.Values[mid.ImpersonatorKey]; !ok {
+			session.Values[mid.ImpersonatorKey] = ctx.Get(r, "user").(models.User).Username
 		}
 		session.Values["id"] = u.Id
 		session.Save(r, w)
@@ -438,15 +453,17 @@ func (as *AdminServer) Login(w http.ResponseWriter, r *http.Request) {
 		}
 		template.Must(templates, err).ExecuteTemplate(w, "base", params)
 	case r.Method == "POST":
+		// Find the user with the provided username
+		username, password := r.FormValue("username"), r.FormValue("password")
 		if as.passwordLoginDisabled() {
+			mid.Audit(r, nil, username, models.AuditLoginFailed, "", "password login is disabled")
 			as.handleInvalidLogin(w, r, "Password login is disabled. Please use single sign-on.")
 			return
 		}
-		// Find the user with the provided username
-		username, password := r.FormValue("username"), r.FormValue("password")
 		u, err := models.GetUserByUsername(username)
 		if err != nil {
 			log.Error(err)
+			mid.Audit(r, nil, username, models.AuditLoginFailed, "", "unknown username")
 			as.handleInvalidLogin(w, r, "Invalid Username/Password")
 			return
 		}
@@ -454,26 +471,29 @@ func (as *AdminServer) Login(w http.ResponseWriter, r *http.Request) {
 		err = auth.ValidatePassword(password, u.Hash)
 		if err != nil {
 			log.Error(err)
+			mid.Audit(r, &u, "", models.AuditLoginFailed, "", "invalid password")
 			as.handleInvalidLogin(w, r, "Invalid Username/Password")
 			return
 		}
 		if u.AccountLocked {
+			mid.Audit(r, &u, "", models.AuditLoginFailed, "", "account locked")
 			as.handleInvalidLogin(w, r, "Account Locked")
 			return
 		}
 		// Users with two-factor authentication enabled have to provide a
 		// code before they're logged in
 		if u.TOTPEnabled {
-			as.startSecondFactor(w, r, u, r.FormValue("next"))
+			as.startSecondFactor(w, r, u, r.FormValue("next"), "password")
 			return
 		}
-		as.completeLogin(w, r, u, r.FormValue("next"))
+		as.completeLogin(w, r, u, r.FormValue("next"), "password")
 	}
 }
 
 // completeLogin logs in the user with a new session and redirects them to the
-// page in next, or to the dashboard.
-func (as *AdminServer) completeLogin(w http.ResponseWriter, r *http.Request, u models.User, next string) {
+// page in next, or to the dashboard. method describes how they signed in,
+// for the audit log.
+func (as *AdminServer) completeLogin(w http.ResponseWriter, r *http.Request, u models.User, next, method string) {
 	session := ctx.Get(r, "session").(*sessions.Session)
 	u.LastLogin = time.Now().UTC()
 	err := models.PutUser(&u)
@@ -491,6 +511,7 @@ func (as *AdminServer) completeLogin(w http.ResponseWriter, r *http.Request, u m
 	clearSecondFactor(session)
 	session.Values["id"] = u.Id
 	session.Save(r, w)
+	mid.Audit(r, &u, "", models.AuditLogin, "", method)
 	err = models.DeleteExpiredSessions()
 	if err != nil {
 		log.Error(err)
@@ -501,6 +522,7 @@ func (as *AdminServer) completeLogin(w http.ResponseWriter, r *http.Request, u m
 // Logout destroys the current user session
 func (as *AdminServer) Logout(w http.ResponseWriter, r *http.Request) {
 	session := ctx.Get(r, "session").(*sessions.Session)
+	mid.AuditUser(r, models.AuditLogout, "", "")
 	// Delete the logged in session so its token can't be reused, keeping only
 	// the logout message for the login page
 	err := mid.RegenerateSession(session)
@@ -568,6 +590,7 @@ func (as *AdminServer) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		if err = mid.RevokeOtherSessions(r, u.Id); err != nil {
 			log.Error(err)
 		}
+		mid.Audit(r, &u, "", models.AuditPasswordChanged, "", "required reset")
 		// TODO: We probably want to flash a message here that the password was
 		// changed successfully. The problem is that when the user resets their
 		// password on first use, they will see two flashes on the dashboard-

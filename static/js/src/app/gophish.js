@@ -259,6 +259,11 @@ var api = {
             return query("/users/" + id, "DELETE", {}, true)
         }
     },
+    auditLog: {
+        get: function (params) {
+            return query("/audit_log/?" + $.param(params), "GET", {}, false)
+        },
+    },
     webhooks: {
         get: function() {
             return query("/webhooks/", "GET", {}, false)
