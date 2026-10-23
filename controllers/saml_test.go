@@ -416,7 +416,7 @@ func TestSSOButtonsForBothProviders(t *testing.T) {
 	}
 	doc, _ := goquery.NewDocumentFromReader(resp.Body)
 	labels := []string{}
-	doc.Find("a.btn-default").Each(func(i int, s *goquery.Selection) {
+	doc.Find("a.btn-sso").Each(func(i int, s *goquery.Selection) {
 		labels = append(labels, strings.TrimSpace(s.Text()))
 	})
 	if strings.Join(labels, ",") != "Sign in with SSO,Sign in with Okta" {

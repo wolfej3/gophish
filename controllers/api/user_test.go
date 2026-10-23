@@ -335,6 +335,10 @@ func TestModifyUserDisableTOTP(t *testing.T) {
 	if remaining != 0 {
 		t.Fatalf("expected recovery codes to be deleted, got %d", remaining)
 	}
+	logs, _ := models.GetAuditLogs(models.AuditLogQuery{Action: models.AuditTOTPDisabled})
+	if len(logs) != 1 || logs[0].Username != "admin" || logs[0].Target != user.Username {
+		t.Fatalf("unexpected audit entries: %+v", logs)
+	}
 }
 
 // TestModifyUserUnlinkOIDC ensures that an admin can unlink a user's single
@@ -365,5 +369,9 @@ func TestModifyUserUnlinkOIDC(t *testing.T) {
 	put(true)
 	if got, _ := models.GetUser(user.Id); got.OIDCIdentity != "" {
 		t.Fatalf("expected the identity to be unlinked, got %q", got.OIDCIdentity)
+	}
+	logs, _ := models.GetAuditLogs(models.AuditLogQuery{Action: models.AuditSSOUnlinked})
+	if len(logs) != 1 || logs[0].Username != "admin" || logs[0].Target != user.Username {
+		t.Fatalf("unexpected audit entries: %+v", logs)
 	}
 }

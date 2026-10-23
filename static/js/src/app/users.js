@@ -198,10 +198,10 @@ const impersonate = (id) => {
 const signInMethods = (user) => {
     let labels = []
     if (user.totp_enabled) {
-        labels.push("<span class='label label-success'>2FA</span>")
+        labels.push("<span class='label label-2fa' title='Two-factor authentication is on'>2FA</span>")
     }
     if (user.oidc_identity || user.saml_identity) {
-        labels.push("<span class='label label-info'>SSO</span>")
+        labels.push("<span class='label label-sso' title='Linked to single sign-on'>SSO</span>")
     }
     return labels.join(" ")
 }

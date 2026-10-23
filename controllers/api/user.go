@@ -231,10 +231,12 @@ func (as *Server) User(w http.ResponseWriter, r *http.Request) {
 				JSONResponse(w, models.Response{Success: false, Message: err.Error()}, http.StatusInternalServerError)
 				return
 			}
+			mid.AuditUser(r, models.AuditTOTPDisabled, existingUser.Username, "turned off by an admin")
 		}
-		if ur.UnlinkOIDC {
+		if ur.UnlinkOIDC && (existingUser.OIDCIdentity != "" || existingUser.SAMLIdentity != "") {
 			existingUser.OIDCIdentity = ""
 			existingUser.SAMLIdentity = ""
+			mid.AuditUser(r, models.AuditSSOUnlinked, existingUser.Username, "unlinked by an admin")
 		}
 		err = models.PutUser(&existingUser)
 		if err != nil {

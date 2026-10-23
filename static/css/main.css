@@ -97,6 +97,30 @@ ul .dropdown-menu .ng-isolate-scope {
     border-top-right-radius: 0;
 }
 
+/* Labels on the User Management page for how each user signs in, dark
+   enough for their white text to stay readable. */
+.label-2fa {
+    background-color: #2e7d32;
+}
+
+.label-sso {
+    background-color: #1f5f8b;
+}
+
+/* Single sign-on buttons are outlined, so that their text stays readable
+   next to the primary sign in button. */
+.form-signin .btn-sso {
+    color: #2c3e50;
+    background-color: #ffffff;
+    border: 2px solid #2c3e50;
+}
+
+.form-signin .btn-sso:hover,
+.form-signin .btn-sso:focus {
+    color: #ffffff;
+    background-color: #2c3e50;
+}
+
 #logo {
     display: block;
     margin-left: auto;

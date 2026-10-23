@@ -13,9 +13,14 @@ const (
 	AuditTOTPDisabled     = "2fa_disabled"
 	AuditRecoveryCodes    = "recovery_codes_regenerated"
 	AuditImpersonate      = "impersonate"
+	AuditSSOUnlinked      = "sso_unlinked"
 	AuditAPIRequest       = "api_request"
 	AuditAPIRequestDenied = "api_request_denied"
 	AuditAPIRequestFailed = "api_request_failed"
+)
+
+// The default and maximum number of entries GetAuditLogs returns at once.
+const (
 	defaultAuditLogsLimit = 100
 	maximumAuditLogsLimit = 1000
 )
