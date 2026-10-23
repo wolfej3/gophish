@@ -52,6 +52,61 @@ In Docker, the admin server uses built-in TLS unless `ADMIN_USE_TLS=false` is se
 
 This applies only to the admin server. The phishing server's `use_tls` setting is unaffected.
 
+### Admin Security
+
+#### Two-factor authentication
+
+Each user can turn on two-factor authentication under **Account Settings**. They scan a QR code with an authenticator app, confirm with a code, and get ten single-use recovery codes. From then on, signing in takes a code after the password (or after single sign-on). Turning it off or getting new recovery codes takes the password and a current code.
+
+An admin can turn off two-factor authentication for a user who has lost their authenticator app and recovery codes, from the user's entry on the **User Management** page.
+
+#### Single sign-on
+
+Gophish can sign users in through an OpenID Connect (OIDC) or SAML 2.0 identity provider, such as Okta, Microsoft Entra ID, or Google Workspace. Each method adds a button to the login page.
+
+The first time someone signs in, Gophish links their identity to the Gophish account whose username matches their email address (or another claim or attribute you choose). After that, the account follows the identity, even if the email address changes. If no account matches, sign in is refused, unless `auto_create_users` is on, in which case an account is created with `default_role` (`user` or `admin`, `user` by default). `allowed_domains` limits sign in to email addresses in those domains. Locked accounts can't sign in, and users with two-factor authentication on still enter a code.
+
+`disable_password_login` hides the password form and refuses password logins, so everyone signs in through the identity provider. API keys still work. If the identity provider becomes unavailable, remove the setting and restart Gophish to sign in with a password.
+
+For OIDC, register Gophish with your identity provider using the redirect URL `https://<your Gophish address>/login/oidc/callback`, then add an `oidc` section to `admin_server` in `config.json`:
+
+```json
+"oidc": {
+	"issuer": "https://login.example.com",
+	"client_id": "gophish",
+	"client_secret": "...",
+	"redirect_url": "https://gophish.example.com:3333/login/oidc/callback",
+	"button_label": "Sign in with Example",
+	"auto_create_users": false,
+	"allowed_domains": ["example.com"]
+}
+```
+
+`scopes` (default `["email", "profile"]`) and `username_claim` (default `email`) can also be set. An email address the identity provider marks as unverified is refused.
+
+For SAML, add a `saml` section to `admin_server`:
+
+```json
+"saml": {
+	"idp_metadata_url": "https://login.example.com/app/gophish/sso/saml/metadata",
+	"root_url": "https://gophish.example.com:3333",
+	"button_label": "Sign in with Example",
+	"username_attribute": "email"
+}
+```
+
+Then give your identity provider Gophish's metadata from `https://<root_url>/saml/metadata`, or set it up by hand with the assertion consumer service URL `https://<root_url>/saml/acs` and the entity ID `https://<root_url>/saml/metadata`. Use a persistent NameID (or the user's email address), since accounts are linked to it. Without `username_attribute`, the NameID is matched against usernames. `idp_metadata_path` can point to a metadata file instead of a URL. Gophish signs its requests with the key pair in `cert_path` and `key_path` (default `gophish_saml.crt` and `gophish_saml.key`), which it creates if they don't exist. The identity provider's metadata is loaded once, on the first sign in, so restart Gophish after the identity provider changes its signing certificate. Sign in must start from Gophish; sign ins started from the identity provider's dashboard are refused.
+
+An admin can unlink a user's single sign-on identity from the **User Management** page, so that the next identity to sign in with that username is linked instead.
+
+#### Audit log
+
+Gophish records logins and failed logins (with the reason and IP address), logouts, password and two-factor changes, impersonation, and every change made through the web interface or the API, including changes that were refused. When an admin impersonates another user, the entries note who is really acting. Admins can read the log on the **Audit Log** page, or from `GET /api/audit_log/`, which takes `username`, `action`, `limit` (up to 1000), and `before_id` (to page back) parameters.
+
+#### Limited API keys
+
+Each user's API key, shown on **Account Settings**, can do anything their account can. For scripts and integrations, users can also create limited keys there, or with `POST /api/api_keys/`. A limited key is read only or read and write, can be limited to some parts of the API (campaigns, groups, templates, landing pages, sending profiles, and so on), and can expire. Limited keys start with `gpk_`, are shown once when they're created, and are used the same way as the full key. A limited key can never do more than its owner's account, and it can't create or manage API keys. Note that a key with write access to users can change its owner's password.
+
 ### Documentation
 
 Documentation can be found on our [site](http://getgophish.com/documentation). Find something missing? Let us know by filing an issue!
