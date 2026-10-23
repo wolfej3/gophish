@@ -22,6 +22,68 @@ $(document).ready(function () {
             })
         return false
     })
+    // Flash messages appear at the top of the page, well above the
+    // two-factor section, so scroll up to show them.
+    var totpFlash = function (flash, message) {
+        flash(message)
+        document.body.scrollTop = 0;
+        document.documentElement.scrollTop = 0;
+    }
+    var showRecoveryCodes = function (codes) {
+        $("#totpRecoveryList").text(codes.join("\n"))
+        $("#totpRecoveryCodes").removeClass("hidden")
+    }
+    $("#totpSetupForm").submit(function (e) {
+        $.post("/settings/2fa/setup", $(this).serialize())
+            .done(function (data) {
+                $("#totpQRCode").attr("src", data.qr_code)
+                $("#totpSecret").text(data.secret)
+                $("#totpSetup").removeClass("hidden")
+                $("#totp_enable_code").focus()
+            })
+            .fail(function (data) {
+                totpFlash(errorFlash, data.responseJSON.message)
+            })
+        return false
+    })
+    $("#totpEnableForm").submit(function (e) {
+        $.post("/settings/2fa/enable", $(this).serialize())
+            .done(function (data) {
+                successFlash(data.message)
+                $("#totpDisabled").addClass("hidden")
+                $("#totpSetup").addClass("hidden")
+                $("#totpEnabled").removeClass("hidden")
+                $("#totpSetupForm, #totpEnableForm").trigger("reset")
+                showRecoveryCodes(data.recovery_codes)
+            })
+            .fail(function (data) {
+                totpFlash(errorFlash, data.responseJSON.message)
+            })
+        return false
+    })
+    $("#totpRegenerate").click(function () {
+        $.post("/settings/2fa/recovery_codes", $("#totpManageForm").serialize())
+            .done(function (data) {
+                successFlash(data.message)
+                $("#totpManageForm").trigger("reset")
+                showRecoveryCodes(data.recovery_codes)
+            })
+            .fail(function (data) {
+                totpFlash(errorFlash, data.responseJSON.message)
+            })
+    })
+    $("#totpDisable").click(function () {
+        $.post("/settings/2fa/disable", $("#totpManageForm").serialize())
+            .done(function (data) {
+                totpFlash(successFlash, data.message)
+                $("#totpManageForm").trigger("reset")
+                $("#totpEnabled, #totpRecoveryCodes").addClass("hidden")
+                $("#totpDisabled").removeClass("hidden")
+            })
+            .fail(function (data) {
+                totpFlash(errorFlash, data.responseJSON.message)
+            })
+    })
     //$("#imapForm").submit(function (e) {
     $("#savesettings").click(function() {
         var imapSettings = {}

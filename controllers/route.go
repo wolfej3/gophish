@@ -70,6 +70,14 @@ func WithWorker(w worker.Worker) AdminServerOption {
 	}
 }
 
+// WithLimiter is an option that sets the rate limiter for logins and other
+// sensitive requests.
+func WithLimiter(limiter *ratelimit.PostLimiter) AdminServerOption {
+	return func(as *AdminServer) {
+		as.limiter = limiter
+	}
+}
+
 // NewAdminServer returns a new instance of the AdminServer with the
 // provided config and options applied.
 func NewAdminServer(config config.AdminServer, options ...AdminServerOption) *AdminServer {
@@ -129,6 +137,7 @@ func (as *AdminServer) registerRoutes() {
 	// Base Front-end routes
 	router.HandleFunc("/", mid.Use(as.Base, mid.RequireLogin))
 	router.HandleFunc("/login", mid.Use(as.Login, as.limiter.Limit))
+	router.HandleFunc("/login/2fa", mid.Use(as.LoginSecondFactor, as.limiter.Limit))
 	router.HandleFunc("/logout", mid.Use(as.Logout, mid.RequireLogin))
 	router.HandleFunc("/reset_password", mid.Use(as.ResetPassword, mid.RequireLogin))
 	router.HandleFunc("/campaigns", mid.Use(as.Campaigns, mid.RequireLogin))
@@ -138,6 +147,10 @@ func (as *AdminServer) registerRoutes() {
 	router.HandleFunc("/landing_pages", mid.Use(as.LandingPages, mid.RequireLogin))
 	router.HandleFunc("/sending_profiles", mid.Use(as.SendingProfiles, mid.RequireLogin))
 	router.HandleFunc("/settings", mid.Use(as.Settings, mid.RequireLogin))
+	router.HandleFunc("/settings/2fa/setup", mid.Use(as.SetupTOTP, as.limiter.Limit, mid.RequireLogin))
+	router.HandleFunc("/settings/2fa/enable", mid.Use(as.EnableTOTP, as.limiter.Limit, mid.RequireLogin))
+	router.HandleFunc("/settings/2fa/disable", mid.Use(as.DisableTOTP, as.limiter.Limit, mid.RequireLogin))
+	router.HandleFunc("/settings/2fa/recovery_codes", mid.Use(as.RegenerateRecoveryCodes, as.limiter.Limit, mid.RequireLogin))
 	router.HandleFunc("/users", mid.Use(as.UserManagement, mid.RequirePermission(models.PermissionModifySystem), mid.RequireLogin))
 	router.HandleFunc("/webhooks", mid.Use(as.Webhooks, mid.RequirePermission(models.PermissionModifySystem), mid.RequireLogin))
 	router.HandleFunc("/impersonate", mid.Use(as.Impersonate, mid.RequirePermission(models.PermissionModifySystem), mid.RequireLogin))
@@ -409,27 +422,41 @@ func (as *AdminServer) Login(w http.ResponseWriter, r *http.Request) {
 			as.handleInvalidLogin(w, r, "Account Locked")
 			return
 		}
-		u.LastLogin = time.Now().UTC()
-		err = models.PutUser(&u)
-		if err != nil {
-			log.Error(err)
-		}
-		// If we've logged in, save the session under a new token and redirect
-		// to the dashboard
-		err = mid.RegenerateSession(session)
-		if err != nil {
-			log.Error(err)
-			as.handleInvalidLogin(w, r, "Error creating session")
+		// Users with two-factor authentication enabled have to provide a
+		// code before they're logged in
+		if u.TOTPEnabled {
+			as.startSecondFactor(w, r, u)
 			return
 		}
-		session.Values["id"] = u.Id
-		session.Save(r, w)
-		err = models.DeleteExpiredSessions()
-		if err != nil {
-			log.Error(err)
-		}
-		as.nextOrIndex(w, r)
+		as.completeLogin(w, r, u)
 	}
+}
+
+// completeLogin logs in the user with a new session and redirects them to the
+// dashboard, or to the page they were trying to reach.
+func (as *AdminServer) completeLogin(w http.ResponseWriter, r *http.Request, u models.User) {
+	session := ctx.Get(r, "session").(*sessions.Session)
+	u.LastLogin = time.Now().UTC()
+	err := models.PutUser(&u)
+	if err != nil {
+		log.Error(err)
+	}
+	// If we've logged in, save the session under a new token and redirect
+	// to the dashboard
+	err = mid.RegenerateSession(session)
+	if err != nil {
+		log.Error(err)
+		as.handleInvalidLogin(w, r, "Error creating session")
+		return
+	}
+	clearSecondFactor(session)
+	session.Values["id"] = u.Id
+	session.Save(r, w)
+	err = models.DeleteExpiredSessions()
+	if err != nil {
+		log.Error(err)
+	}
+	as.nextOrIndex(w, r)
 }
 
 // Logout destroys the current user session

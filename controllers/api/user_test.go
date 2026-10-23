@@ -295,3 +295,44 @@ func TestModifyUserRevokesSessions(t *testing.T) {
 		}
 	}
 }
+
+// TestModifyUserDisableTOTP ensures that an admin can turn off two-factor
+// authentication for a user who has lost their authenticator app.
+func TestModifyUserDisableTOTP(t *testing.T) {
+	testCtx := setupTest(t)
+	user := createUnpriviledgedUser(t, models.RoleUser)
+	if _, err := models.EnableTOTP(user, "JBSWY3DPEHPK3PXP", 0); err != nil {
+		t.Fatalf("error enabling two-factor authentication: %v", err)
+	}
+	payload := userRequest{
+		Username:    user.Username,
+		Role:        user.Role.Slug,
+		DisableTOTP: true,
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("error marshaling userRequest payload: %v", err)
+	}
+	r := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/users/%d", user.Id), bytes.NewBuffer(body))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", testCtx.apiKey))
+	w := httptest.NewRecorder()
+	testCtx.apiServer.ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("unexpected error code received. expected %d got %d", http.StatusOK, w.Code)
+	}
+	got, err := models.GetUser(user.Id)
+	if err != nil {
+		t.Fatalf("error getting user: %v", err)
+	}
+	if got.TOTPEnabled || got.TOTPSecret != "" {
+		t.Fatal("expected two-factor authentication to be disabled")
+	}
+	remaining, err := models.CountRecoveryCodes(user.Id)
+	if err != nil {
+		t.Fatalf("error counting recovery codes: %v", err)
+	}
+	if remaining != 0 {
+		t.Fatalf("expected recovery codes to be deleted, got %d", remaining)
+	}
+}

@@ -84,6 +84,72 @@
                 <button class="btn btn-primary" type="submit"><i class="fa fa-save"></i> Save</button>
             </form>
             <br />
+            <hr />
+            <h3>Two-Factor Authentication</h3>
+            <div id="totpDisabled" {{if .User.TOTPEnabled}}class="hidden"{{end}}>
+                <p>Two-factor authentication is <strong>off</strong>. Turn it on to require a code from an
+                    authenticator app each time you sign in.</p>
+                <form id="totpSetupForm">
+                    <div class="row">
+                        <label for="totp_setup_password" class="col-sm-2 control-label form-label">Password:</label>
+                        <div class="col-md-6">
+                            <input type="password" id="totp_setup_password" name="current_password" autocomplete="current-password"
+                                class="form-control" />
+                        </div>
+                        <button class="btn btn-primary" type="submit"><i class="fa fa-lock"></i> Set Up</button>
+                    </div>
+                    <input type="hidden" name="csrf_token" value="{{.Token}}" />
+                </form>
+                <div id="totpSetup" class="hidden">
+                    <br />
+                    <p>Scan this QR code with your authenticator app, or enter the key by hand.</p>
+                    <img id="totpQRCode" alt="Two-factor authentication QR code" />
+                    <p>Key: <code id="totpSecret"></code></p>
+                    <form id="totpEnableForm">
+                        <div class="row">
+                            <label for="totp_enable_code" class="col-sm-2 control-label form-label">Code:</label>
+                            <div class="col-md-6">
+                                <input type="text" id="totp_enable_code" name="code" autocomplete="one-time-code"
+                                    class="form-control" />
+                            </div>
+                            <button class="btn btn-primary" type="submit"><i class="fa fa-check"></i> Enable</button>
+                        </div>
+                        <input type="hidden" name="csrf_token" value="{{.Token}}" />
+                    </form>
+                </div>
+            </div>
+            <div id="totpEnabled" {{if not .User.TOTPEnabled}}class="hidden"{{end}}>
+                <p>Two-factor authentication is <strong>on</strong>. To turn it off or get new recovery codes,
+                    enter your password and a current code.</p>
+                <form id="totpManageForm">
+                    <div class="row">
+                        <label for="totp_manage_password" class="col-sm-2 control-label form-label">Password:</label>
+                        <div class="col-md-6">
+                            <input type="password" id="totp_manage_password" name="current_password" autocomplete="current-password"
+                                class="form-control" />
+                        </div>
+                    </div>
+                    <br />
+                    <div class="row">
+                        <label for="totp_manage_code" class="col-sm-2 control-label form-label">Code:</label>
+                        <div class="col-md-6">
+                            <input type="text" id="totp_manage_code" name="code" autocomplete="one-time-code"
+                                class="form-control" />
+                        </div>
+                    </div>
+                    <input type="hidden" name="csrf_token" value="{{.Token}}" />
+                    <br />
+                    <button class="btn btn-primary" type="button" id="totpRegenerate"><i class="fa fa-refresh"></i> New Recovery Codes</button>
+                    <button class="btn btn-danger" type="button" id="totpDisable"><i class="fa fa-unlock"></i> Turn Off</button>
+                </form>
+            </div>
+            <div id="totpRecoveryCodes" class="hidden">
+                <br />
+                <div class="alert alert-warning">Save these recovery codes somewhere safe. Each one can be used once
+                    to sign in if you lose your authenticator app. They won't be shown again.</div>
+                <pre id="totpRecoveryList"></pre>
+            </div>
+            <br />
         </div>
         <div role="tabpanel" class="tab-pane" id="uiSettings">
             <br />

@@ -23,6 +23,9 @@ type User struct {
 	PasswordChangeRequired bool      `json:"password_change_required"`
 	AccountLocked          bool      `json:"account_locked"`
 	LastLogin              time.Time `json:"last_login"`
+	TOTPSecret             string    `json:"-" gorm:"column:totp_secret"`
+	TOTPEnabled            bool      `json:"totp_enabled" gorm:"column:totp_enabled"`
+	TOTPLastStep           int64     `json:"-" gorm:"column:totp_last_step"`
 }
 
 // GetUser returns the user that the given id corresponds to. If no user is found, an
@@ -156,6 +159,10 @@ func DeleteUser(id int64) error {
 		if err != nil {
 			return err
 		}
+	}
+	err = db.Where("user_id=?", id).Delete(&RecoveryCode{}).Error
+	if err != nil {
+		return err
 	}
 	// Sign the user out everywhere
 	err = DeleteUserSessions(id, "")

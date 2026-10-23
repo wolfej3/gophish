@@ -35,6 +35,9 @@ type userRequest struct {
 	Role                   string `json:"role"`
 	PasswordChangeRequired bool   `json:"password_change_required"`
 	AccountLocked          bool   `json:"account_locked"`
+	// DisableTOTP turns off two-factor authentication for the user, for when
+	// they've lost their authenticator app and recovery codes.
+	DisableTOTP bool `json:"disable_totp"`
 }
 
 func (ur *userRequest) Validate(existingUser *models.User) error {
@@ -218,6 +221,13 @@ func (as *Server) User(w http.ResponseWriter, r *http.Request) {
 			existingUser.Hash = hash
 		}
 		existingUser.AccountLocked = ur.AccountLocked
+		if ur.DisableTOTP && existingUser.TOTPEnabled {
+			err = models.DisableTOTP(&existingUser)
+			if err != nil {
+				JSONResponse(w, models.Response{Success: false, Message: err.Error()}, http.StatusInternalServerError)
+				return
+			}
+		}
 		err = models.PutUser(&existingUser)
 		if err != nil {
 			JSONResponse(w, models.Response{Success: false, Message: err.Error()}, http.StatusInternalServerError)
