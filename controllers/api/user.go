@@ -38,9 +38,9 @@ type userRequest struct {
 	// DisableTOTP turns off two-factor authentication for the user, for when
 	// they've lost their authenticator app and recovery codes.
 	DisableTOTP bool `json:"disable_totp"`
-	// UnlinkOIDC removes the link between the user and their single sign-on
-	// identity, so that the next identity to sign in with their username is
-	// linked instead.
+	// UnlinkOIDC removes the links between the user and their single sign-on
+	// identities (OIDC and SAML), so that the next identity to sign in with
+	// their username is linked instead.
 	UnlinkOIDC bool `json:"unlink_oidc"`
 }
 
@@ -234,6 +234,7 @@ func (as *Server) User(w http.ResponseWriter, r *http.Request) {
 		}
 		if ur.UnlinkOIDC {
 			existingUser.OIDCIdentity = ""
+			existingUser.SAMLIdentity = ""
 		}
 		err = models.PutUser(&existingUser)
 		if err != nil {

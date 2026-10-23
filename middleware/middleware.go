@@ -14,6 +14,10 @@ import (
 // CSRFExemptPrefixes are a list of routes that are exempt from CSRF protection
 var CSRFExemptPrefixes = []string{
 	"/api",
+	// SAML identity providers post their responses here from their own
+	// site. The signed response, which must answer a request this browser
+	// started, takes the place of a CSRF token.
+	"/saml/acs",
 }
 
 // CSRFExceptions is a middleware that prevents CSRF checks on routes listed in

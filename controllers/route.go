@@ -41,6 +41,7 @@ type AdminServer struct {
 	config  config.AdminServer
 	limiter *ratelimit.PostLimiter
 	oidc    *oidcClient
+	saml    *samlClient
 }
 
 var defaultTLSConfig = &tls.Config{
@@ -102,6 +103,14 @@ func NewAdminServer(config config.AdminServer, options ...AdminServerOption) *Ad
 			as.oidc = client
 		}
 	}
+	if config.SAML != nil {
+		client, err := newSAMLClient(*config.SAML)
+		if err != nil {
+			log.Errorf("SAML single sign-on is disabled: %v", err)
+		} else {
+			as.saml = client
+		}
+	}
 	for _, opt := range options {
 		opt(as)
 	}
@@ -149,6 +158,9 @@ func (as *AdminServer) registerRoutes() {
 	router.HandleFunc("/login/2fa", mid.Use(as.LoginSecondFactor, as.limiter.Limit))
 	router.HandleFunc("/login/oidc", as.OIDCLogin)
 	router.HandleFunc("/login/oidc/callback", as.OIDCCallback)
+	router.HandleFunc("/login/saml", as.SAMLLogin)
+	router.HandleFunc("/saml/acs", as.SAMLACS)
+	router.HandleFunc("/saml/metadata", as.SAMLMetadata)
 	router.HandleFunc("/logout", mid.Use(as.Logout, mid.RequireLogin))
 	router.HandleFunc("/reset_password", mid.Use(as.ResetPassword, mid.RequireLogin))
 	router.HandleFunc("/campaigns", mid.Use(as.Campaigns, mid.RequireLogin))
@@ -355,22 +367,22 @@ func redirectNext(w http.ResponseWriter, r *http.Request, next string) {
 
 // loginParams are the template parameters for the login page.
 type loginParams struct {
-	User     models.User
-	Title    string
-	Flashes  []interface{}
-	Token    string
-	SSOLabel string
-	Next     string
+	User       models.User
+	Title      string
+	Flashes    []interface{}
+	Token      string
+	SSOButtons []ssoButton
+	Next       string
 	// PasswordLoginDisabled hides the username and password form
 	PasswordLoginDisabled bool
 }
 
 func (as *AdminServer) newLoginParams(r *http.Request) loginParams {
 	return loginParams{
-		Title:    "Login",
-		Token:    csrf.Token(r),
-		SSOLabel: as.ssoLabel(),
-		Next:     r.FormValue("next"),
+		Title:      "Login",
+		Token:      csrf.Token(r),
+		SSOButtons: as.ssoButtons(),
+		Next:       r.FormValue("next"),
 
 		PasswordLoginDisabled: as.passwordLoginDisabled(),
 	}

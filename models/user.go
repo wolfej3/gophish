@@ -29,6 +29,34 @@ type User struct {
 	// OIDCIdentity is the issuer and subject of the single sign-on identity
 	// linked to this account, if any.
 	OIDCIdentity string `json:"oidc_identity" gorm:"column:oidc_identity"`
+	// SAMLIdentity is the identity provider and NameID of the SAML identity
+	// linked to this account, if any.
+	SAMLIdentity string `json:"saml_identity" gorm:"column:saml_identity"`
+}
+
+// Single sign-on providers an account can be linked to.
+const (
+	SSOProviderOIDC = "oidc"
+	SSOProviderSAML = "saml"
+)
+
+// SSOIdentity returns the identity from the single sign-on provider linked
+// to the account, if any.
+func (u *User) SSOIdentity(provider string) string {
+	if provider == SSOProviderSAML {
+		return u.SAMLIdentity
+	}
+	return u.OIDCIdentity
+}
+
+// SetSSOIdentity links the account to an identity from the single sign-on
+// provider.
+func (u *User) SetSSOIdentity(provider, identity string) {
+	if provider == SSOProviderSAML {
+		u.SAMLIdentity = identity
+	} else {
+		u.OIDCIdentity = identity
+	}
 }
 
 // GetUser returns the user that the given id corresponds to. If no user is found, an
@@ -54,11 +82,15 @@ func GetUserByAPIKey(key string) (User, error) {
 	return u, err
 }
 
-// GetUserByOIDCIdentity returns the user linked to the given single sign-on
-// identity. If no user is found, an error is thrown.
-func GetUserByOIDCIdentity(identity string) (User, error) {
+// GetUserBySSOIdentity returns the user linked to the given identity from
+// the single sign-on provider. If no user is found, an error is thrown.
+func GetUserBySSOIdentity(provider, identity string) (User, error) {
+	column := "oidc_identity"
+	if provider == SSOProviderSAML {
+		column = "saml_identity"
+	}
 	u := User{}
-	err := db.Preload("Role").Where("oidc_identity = ?", identity).First(&u).Error
+	err := db.Preload("Role").Where(column+" = ?", identity).First(&u).Error
 	return u, err
 }
 

@@ -50,12 +50,12 @@
             <input type="text" name="username" class="form-control top-input" placeholder="Username" required autofocus>
             <input type="password" name="password" class="form-control bottom-input" placeholder="Password" autocomplete="off" required>
             <button class="btn btn-lg btn-primary btn-block" type="submit">Sign in</button>
-            {{if .SSOLabel}}
+            {{if .SSOButtons}}
             <p class="text-center">or</p>
             {{end}}
             {{end}}
-            {{if .SSOLabel}}
-            <a class="btn btn-lg btn-default btn-block" href="/login/oidc{{if .Next}}?next={{.Next}}{{end}}">{{.SSOLabel}}</a>
+            {{range .SSOButtons}}
+            <a class="btn btn-lg btn-default btn-block" href="{{.URL}}{{if $.Next}}?next={{$.Next}}{{end}}">{{.Label}}</a>
             {{end}}
         </form>
     </div>

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -14,12 +13,9 @@ import (
 	"github.com/gophish/gophish/auth"
 	"github.com/gophish/gophish/config"
 	ctx "github.com/gophish/gophish/context"
-	log "github.com/gophish/gophish/logger"
-	mid "github.com/gophish/gophish/middleware"
 	"github.com/gophish/gophish/models"
 	"github.com/gorilla/sessions"
 	"golang.org/x/oauth2"
-	"gorm.io/gorm"
 )
 
 // Session keys used while a user is signing in through the identity
@@ -33,10 +29,6 @@ const (
 
 // oidcTimeout bounds each request we make to the identity provider.
 const oidcTimeout = 15 * time.Second
-
-// errSSOLogin is shown to users when single sign-on fails. The reason is
-// logged rather than shown, since it may reveal details about accounts.
-var errSSOLogin = errors.New("Single sign-on failed. Please contact your administrator.")
 
 // oidcClient signs users in to the admin server through an OpenID Connect
 // identity provider. The provider's configuration is discovered the first
@@ -97,35 +89,6 @@ func (c *oidcClient) setup(ctx context.Context) error {
 	}
 	c.verifier = provider.Verifier(&oidc.Config{ClientID: c.conf.ClientID})
 	return nil
-}
-
-// ssoLabel returns the label for the single sign-on button on the login page,
-// or an empty string if single sign-on isn't configured.
-func (as *AdminServer) ssoLabel() string {
-	if as.oidc == nil {
-		return ""
-	}
-	return as.oidc.conf.ButtonLabel
-}
-
-// passwordLoginDisabled returns whether users must sign in through single
-// sign-on instead of with a password.
-func (as *AdminServer) passwordLoginDisabled() bool {
-	return as.oidc != nil && as.oidc.conf.DisablePasswordLogin
-}
-
-// ssoError logs why single sign-on failed and sends the user back to the
-// login page.
-func (as *AdminServer) ssoError(w http.ResponseWriter, r *http.Request, err error) {
-	log.Errorf("single sign-on failed: %v", err)
-	mid.Audit(r, nil, "", models.AuditLoginFailed, "", "single sign-on: "+err.Error())
-	session := ctx.Get(r, "session").(*sessions.Session)
-	for _, k := range []string{oidcStateKey, oidcNonceKey, oidcVerifierKey, oidcNextKey} {
-		delete(session.Values, k)
-	}
-	Flash(w, r, "danger", errSSOLogin.Error())
-	session.Save(r, w)
-	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
 // OIDCLogin sends the user to the identity provider to sign in.
@@ -207,115 +170,31 @@ func (as *AdminServer) OIDCCallback(w http.ResponseWriter, r *http.Request) {
 		as.ssoError(w, r, fmt.Errorf("parsing claims: %w", err))
 		return
 	}
-	u, err := as.oidcUser(idToken, claims)
-	if err != nil {
-		as.ssoError(w, r, err)
-		return
-	}
-	if u.AccountLocked {
-		as.ssoError(w, r, fmt.Errorf("account %q is locked", u.Username))
-		return
-	}
-	// There's no point making someone choose a new password they can't use
-	if as.passwordLoginDisabled() && u.PasswordChangeRequired {
-		u.PasswordChangeRequired = false
-		if err := models.PutUser(&u); err != nil {
-			as.ssoError(w, r, err)
-			return
-		}
-	}
-	if u.TOTPEnabled {
-		as.startSecondFactor(w, r, u, next, "single sign-on")
-		return
-	}
-	as.completeLogin(w, r, u, next, "single sign-on")
-}
-
-// oidcUser returns the Gophish account for a verified ID token. Accounts are
-// found by the identity they're linked to. An account that isn't linked yet
-// is linked the first time its user signs in, matched on username. If there
-// is no matching account, one is created if the configuration allows it.
-func (as *AdminServer) oidcUser(idToken *oidc.IDToken, claims map[string]interface{}) (models.User, error) {
-	conf := as.oidc.conf
-	identity := idToken.Issuer + " " + idToken.Subject
-	u, err := models.GetUserByOIDCIdentity(identity)
-	if err == nil {
-		return u, nil
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return u, err
-	}
-	username, _ := claims[conf.UsernameClaim].(string)
+	username, _ := claims[as.oidc.conf.UsernameClaim].(string)
 	if username == "" {
-		return u, fmt.Errorf("id_token has no %q claim", conf.UsernameClaim)
+		as.ssoError(w, r, fmt.Errorf("id_token has no %q claim", as.oidc.conf.UsernameClaim))
+		return
 	}
 	// Don't trust an email address the identity provider says it hasn't
 	// verified, since anyone could have claimed it.
-	if conf.UsernameClaim == "email" {
+	if as.oidc.conf.UsernameClaim == "email" {
 		if verified, ok := claims["email_verified"].(bool); ok && !verified {
-			return u, fmt.Errorf("email %q isn't verified", username)
+			as.ssoError(w, r, fmt.Errorf("email %q isn't verified", username))
+			return
 		}
 	}
-	if len(conf.AllowedDomains) > 0 && !inAllowedDomain(username, conf.AllowedDomains) {
-		return u, fmt.Errorf("%q isn't in an allowed domain", username)
-	}
-	u, err = models.GetUserByUsername(username)
-	switch {
-	case err == nil:
-		if u.OIDCIdentity != "" {
-			return u, fmt.Errorf("account %q is already linked to another identity", username)
-		}
-		if u.AccountLocked {
-			return u, fmt.Errorf("account %q is locked", username)
-		}
-		u.OIDCIdentity = identity
-		if err := models.PutUser(&u); err != nil {
-			return u, err
-		}
-		log.Infof("linked account %q to single sign-on identity %q", username, identity)
-		return u, nil
-	case !errors.Is(err, gorm.ErrRecordNotFound):
-		return u, err
-	case !conf.AutoCreateUsers:
-		return u, fmt.Errorf("no account for %q", username)
-	}
-	role, err := models.GetRoleBySlug(conf.DefaultRole)
-	if err != nil {
-		return u, fmt.Errorf("getting role %q: %w", conf.DefaultRole, err)
-	}
-	// The account signs in only through single sign-on, so its password is
-	// a random one nobody knows.
-	hash, err := auth.GeneratePasswordHash(auth.GenerateSecureKey(32))
-	if err != nil {
-		return u, err
-	}
-	u = models.User{
-		Username:     username,
-		Hash:         hash,
-		ApiKey:       auth.GenerateSecureKey(auth.APIKeyLength),
-		Role:         role,
-		RoleID:       role.ID,
-		OIDCIdentity: identity,
-	}
-	if err := models.PutUser(&u); err != nil {
-		return u, err
-	}
-	log.Infof("created account %q for single sign-on identity %q", username, identity)
-	return u, nil
+	as.finishSSOLogin(w, r, ssoIdentity{
+		Provider: models.SSOProviderOIDC,
+		Identity: idToken.Issuer + " " + idToken.Subject,
+		Username: username,
+	}, as.oidc.accounts(), next)
 }
 
-// inAllowedDomain returns whether the email address is in one of the
-// domains.
-func inAllowedDomain(email string, domains []string) bool {
-	at := strings.LastIndex(email, "@")
-	if at < 0 {
-		return false
+// accounts returns how the configuration matches and creates accounts.
+func (c *oidcClient) accounts() ssoAccounts {
+	return ssoAccounts{
+		AutoCreateUsers: c.conf.AutoCreateUsers,
+		DefaultRole:     c.conf.DefaultRole,
+		AllowedDomains:  c.conf.AllowedDomains,
 	}
-	domain := email[at+1:]
-	for _, d := range domains {
-		if strings.EqualFold(domain, strings.TrimPrefix(d, "@")) {
-			return true
-		}
-	}
-	return false
 }

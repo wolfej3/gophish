@@ -80,8 +80,9 @@ const edit = (id) => {
                 $("#force_password_change_checkbox").prop('checked', user.password_change_required)
                 $("#account_locked_checkbox").prop('checked', user.account_locked)
                 $("#disable_totp_group").toggleClass("hidden", !user.totp_enabled)
-                $("#unlink_oidc_group").toggleClass("hidden", !user.oidc_identity)
-                $("#oidc_identity").text(user.oidc_identity || "")
+                let identities = [user.oidc_identity, user.saml_identity].filter((i) => i)
+                $("#unlink_oidc_group").toggleClass("hidden", identities.length == 0)
+                $("#oidc_identity").text(identities.join(", "))
                 if (user.username == "admin") {
                     $("#username").attr("disabled", true);
                 }
@@ -199,7 +200,7 @@ const signInMethods = (user) => {
     if (user.totp_enabled) {
         labels.push("<span class='label label-success'>2FA</span>")
     }
-    if (user.oidc_identity) {
+    if (user.oidc_identity || user.saml_identity) {
         labels.push("<span class='label label-info'>SSO</span>")
     }
     return labels.join(" ")
