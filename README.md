@@ -99,6 +99,18 @@ In Docker, the admin server uses built-in TLS unless `ADMIN_USE_TLS=false` is se
 
 This applies only to the admin server. The phishing server's `use_tls` setting is unaffected.
 
+### Teams
+
+Campaigns, templates, landing pages, groups, and sending profiles belong to a **team** rather than to one user, so everyone on a team shares the same objects without sharing a login. Each object also records which user created it.
+
+A user has a role on each team they belong to: **editor** (create and change the team's objects) or **viewer** (read only). Users with the admin role can see and edit every team.
+
+Admins manage teams on the **Teams** page: create and rename teams, and add, remove, or change the role of each member. Users who belong to more than one team get a team switcher at the top of the sidebar, which decides the team the pages act in.
+
+When you upgrade, everything that existed before teams moves into a team called **Default**, and every existing user becomes an editor on it, so nothing changes until you create more teams. A new user belongs to no team until an admin adds them to one, so add new users to a team before they sign in.
+
+Teams are the first step toward hosting Gophish for multiple separate client organizations; those will later contain teams.
+
 ### Admin Security
 
 #### Sessions
