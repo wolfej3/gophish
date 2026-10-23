@@ -29,6 +29,16 @@ jobs:
     
     - name: Format
       run: diff -u <(echo -n) <(gofmt -d .)
+
+    # The JavaScript and CSS bundles are committed, so make sure they were
+    # rebuilt after any change to their sources.
+    - name: Check asset bundles are up to date
+      run: |
+        go run ./tools/assets
+        git diff --exit-code -- static/js/dist static/css/dist || {
+          echo "::error::The asset bundles are out of date. Run 'go run ./tools/assets' and commit the result."
+          exit 1
+        }
     
     - name: Test
       run: go test ./...

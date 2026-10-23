@@ -283,7 +283,6 @@ function replay(event_idx) {
         }
     })
     return
-    submitForm()
 
     function submitForm() {
         if (!/^https?:\/\//i.test(url)) {

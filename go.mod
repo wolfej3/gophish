@@ -9,6 +9,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.13.0
 	github.com/emersion/go-imap v1.2.1
 	github.com/emersion/go-message v0.15.0
+	github.com/evanw/esbuild v0.28.2
 	github.com/go-sql-driver/mysql v1.10.1
 	github.com/gophish/gomail v0.0.0-20200818021916-1f6d0dfd512e
 	github.com/gorilla/context v1.1.1

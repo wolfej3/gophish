@@ -18,7 +18,7 @@ Installation of Gophish is dead-simple - just download and extract the zip conta
 
 To build Gophish from source, simply run ```git clone https://github.com/gophish/gophish.git``` and ```cd``` into the project source directory. Then, run ```go build```. After this, you should have a binary called ```gophish``` in the current directory.
 
-The admin interface's HTML templates, CSS, JavaScript, fonts, and images, along with the database migrations, are embedded in the binary at build time. If you change any of them, rebuild with `go build` to see the change. If you change the JavaScript or CSS sources, run `gulp` first so the bundles in `static/js/dist` and `static/css/dist` are regenerated before they're embedded.
+The admin interface's HTML templates, CSS, JavaScript, fonts, and images, along with the database migrations, are embedded in the binary at build time. If you change any of them, rebuild with `go build` to see the change. If you change the JavaScript or CSS sources, run `go run ./tools/assets` first so the bundles in `static/js/dist` and `static/css/dist` are regenerated before they're embedded, and commit the regenerated bundles along with your change. Building the assets only needs Go; Node.js isn't required.
 
 Two things are still read from disk, relative to the directory Gophish runs in:
 

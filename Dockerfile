@@ -1,24 +1,11 @@
-# Minify client side assets (JavaScript)
-FROM node:latest AS build-js
-
-RUN npm install gulp gulp-cli -g
-
-WORKDIR /build
-COPY . .
-RUN npm install --only=dev
-RUN gulp
-
-
 # Build Golang binary
 FROM golang:1.26.10 AS build-golang
 
 WORKDIR /go/src/github.com/gophish/gophish
 COPY . .
-# The admin assets are embedded in the binary, so the freshly built bundles
-# must be in place before compiling.
-COPY --from=build-js /build/static/js/dist/ ./static/js/dist/
-COPY --from=build-js /build/static/css/dist/ ./static/css/dist/
-RUN go mod download && go build -v
+# Rebuild the JavaScript and CSS bundles before compiling, since they're
+# embedded in the binary.
+RUN go mod download && go run ./tools/assets && go build -v
 
 
 # Runtime container
