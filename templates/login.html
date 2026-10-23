@@ -45,12 +45,16 @@
             <img id="logo" src="/images/logo_purple.png" />
             <h2 class="form-signin-heading">Please sign in</h2>
             {{template "flashes" .Flashes}}
+            <input type="hidden" name="csrf_token" value="{{.Token}}" />
+            {{if not .PasswordLoginDisabled}}
             <input type="text" name="username" class="form-control top-input" placeholder="Username" required autofocus>
             <input type="password" name="password" class="form-control bottom-input" placeholder="Password" autocomplete="off" required>
-            <input type="hidden" name="csrf_token" value="{{.Token}}" />
             <button class="btn btn-lg btn-primary btn-block" type="submit">Sign in</button>
             {{if .SSOLabel}}
             <p class="text-center">or</p>
+            {{end}}
+            {{end}}
+            {{if .SSOLabel}}
             <a class="btn btn-lg btn-default btn-block" href="/login/oidc{{if .Next}}?next={{.Next}}{{end}}">{{.SSOLabel}}</a>
             {{end}}
         </form>

@@ -28,7 +28,7 @@ type User struct {
 	TOTPLastStep           int64     `json:"-" gorm:"column:totp_last_step"`
 	// OIDCIdentity is the issuer and subject of the single sign-on identity
 	// linked to this account, if any.
-	OIDCIdentity string `json:"-" gorm:"column:oidc_identity"`
+	OIDCIdentity string `json:"oidc_identity" gorm:"column:oidc_identity"`
 }
 
 // GetUser returns the user that the given id corresponds to. If no user is found, an

@@ -359,6 +359,8 @@ type loginParams struct {
 	Token    string
 	SSOLabel string
 	Next     string
+	// PasswordLoginDisabled hides the username and password form
+	PasswordLoginDisabled bool
 }
 
 func (as *AdminServer) newLoginParams(r *http.Request) loginParams {
@@ -367,6 +369,8 @@ func (as *AdminServer) newLoginParams(r *http.Request) loginParams {
 		Token:    csrf.Token(r),
 		SSOLabel: as.ssoLabel(),
 		Next:     r.FormValue("next"),
+
+		PasswordLoginDisabled: as.passwordLoginDisabled(),
 	}
 }
 
@@ -434,6 +438,10 @@ func (as *AdminServer) Login(w http.ResponseWriter, r *http.Request) {
 		}
 		template.Must(templates, err).ExecuteTemplate(w, "base", params)
 	case r.Method == "POST":
+		if as.passwordLoginDisabled() {
+			as.handleInvalidLogin(w, r, "Password login is disabled. Please use single sign-on.")
+			return
+		}
 		// Find the user with the provided username
 		username, password := r.FormValue("username"), r.FormValue("password")
 		u, err := models.GetUserByUsername(username)

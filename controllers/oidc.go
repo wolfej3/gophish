@@ -107,6 +107,12 @@ func (as *AdminServer) ssoLabel() string {
 	return as.oidc.conf.ButtonLabel
 }
 
+// passwordLoginDisabled returns whether users must sign in through single
+// sign-on instead of with a password.
+func (as *AdminServer) passwordLoginDisabled() bool {
+	return as.oidc != nil && as.oidc.conf.DisablePasswordLogin
+}
+
 // ssoError logs why single sign-on failed and sends the user back to the
 // login page.
 func (as *AdminServer) ssoError(w http.ResponseWriter, r *http.Request, err error) {
@@ -207,6 +213,14 @@ func (as *AdminServer) OIDCCallback(w http.ResponseWriter, r *http.Request) {
 	if u.AccountLocked {
 		as.ssoError(w, r, fmt.Errorf("account %q is locked", u.Username))
 		return
+	}
+	// There's no point making someone choose a new password they can't use
+	if as.passwordLoginDisabled() && u.PasswordChangeRequired {
+		u.PasswordChangeRequired = false
+		if err := models.PutUser(&u); err != nil {
+			as.ssoError(w, r, err)
+			return
+		}
 	}
 	if u.TOTPEnabled {
 		as.startSecondFactor(w, r, u, next)

@@ -46,6 +46,11 @@ type OIDC struct {
 	// AllowedDomains, if set, limits sign in to usernames ending in one of
 	// these email domains.
 	AllowedDomains []string `json:"allowed_domains"`
+	// DisablePasswordLogin turns off signing in with a Gophish password, so
+	// that everyone signs in through the identity provider. API keys still
+	// work. To recover if the identity provider is unavailable, remove this
+	// setting and restart Gophish.
+	DisablePasswordLogin bool `json:"disable_password_login"`
 }
 
 // PhishServer represents the Phish server configuration details

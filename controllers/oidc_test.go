@@ -458,3 +458,35 @@ func TestInAllowedDomain(t *testing.T) {
 		}
 	}
 }
+
+func TestSSODisablePasswordLogin(t *testing.T) {
+	ctx, idp := setupOIDCTest(t, func(c *config.OIDC) { c.DisablePasswordLogin = true })
+	defer tearDown(t, ctx)
+	client := newJarClient(t, ctx)
+	resp, err := client.Get(ctx.adminServer.URL + "/login")
+	if err != nil {
+		t.Fatalf("error requesting /login: %v", err)
+	}
+	doc, _ := goquery.NewDocumentFromReader(resp.Body)
+	if doc.Find("input[name='password']").Length() != 0 {
+		t.Fatal("expected the password form to be hidden")
+	}
+	if doc.Find("a[href^='/login/oidc']").Length() != 1 {
+		t.Fatal("expected the single sign-on button")
+	}
+	// A password login is refused even with the right password
+	resp = postForm(t, ctx, client, "/login", url.Values{"username": {"admin"}, "password": {"gophish"}})
+	if resp.StatusCode == http.StatusFound {
+		t.Fatalf("expected the password login to be refused, got %d", resp.StatusCode)
+	}
+	expectLoggedIn(t, ctx, client, false)
+
+	// Signing in through the identity provider skips a pending password
+	// change, since the password can't be used
+	u := createSSOUser(t, "alice@example.com")
+	u.PasswordChangeRequired = true
+	models.PutUser(&u)
+	idp.signIn("alice-id", map[string]interface{}{"email": "alice@example.com"})
+	expectSSORedirect(t, ssoLogin(t, ctx, client, "/campaigns"), "/campaigns")
+	expectLoggedIn(t, ctx, client, true)
+}

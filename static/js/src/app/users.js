@@ -12,7 +12,9 @@ const save = (id) => {
         password: $("#password").val(),
         role: $("#role").val(),
         password_change_required: $("#force_password_change_checkbox").prop('checked'),
-        account_locked: $("#account_locked_checkbox").prop('checked')
+        account_locked: $("#account_locked_checkbox").prop('checked'),
+        disable_totp: $("#disable_totp_checkbox").prop('checked'),
+        unlink_oidc: $("#unlink_oidc_checkbox").prop('checked')
     }
     // Submit the user
     if (id != -1) {
@@ -52,6 +54,9 @@ const dismiss = () => {
     $("#role").val("")
     $("#force_password_change_checkbox").prop('checked', true)
     $("#account_locked_checkbox").prop('checked', false)
+    $("#disable_totp_checkbox, #unlink_oidc_checkbox").prop('checked', false)
+    $("#disable_totp_group, #unlink_oidc_group").addClass("hidden")
+    $("#oidc_identity").text("")
     $("#modal\\.flashes").empty()
 }
 
@@ -74,6 +79,9 @@ const edit = (id) => {
                 $("#role").trigger("change")
                 $("#force_password_change_checkbox").prop('checked', user.password_change_required)
                 $("#account_locked_checkbox").prop('checked', user.account_locked)
+                $("#disable_totp_group").toggleClass("hidden", !user.totp_enabled)
+                $("#unlink_oidc_group").toggleClass("hidden", !user.oidc_identity)
+                $("#oidc_identity").text(user.oidc_identity || "")
                 if (user.username == "admin") {
                     $("#username").attr("disabled", true);
                 }
@@ -185,6 +193,18 @@ const impersonate = (id) => {
       })
 }
 
+// signInMethods returns labels for the extra ways the user signs in.
+const signInMethods = (user) => {
+    let labels = []
+    if (user.totp_enabled) {
+        labels.push("<span class='label label-success'>2FA</span>")
+    }
+    if (user.oidc_identity) {
+        labels.push("<span class='label label-info'>SSO</span>")
+    }
+    return labels.join(" ")
+}
+
 const load = () => {
     $("#userTable").hide()
     $("#loading").show()
@@ -211,6 +231,7 @@ const load = () => {
                     escapeHtml(user.username),
                     escapeHtml(user.role.name),
                     lastlogin,
+                    signInMethods(user),
                     "<div class='pull-right'>\
                     <button class='btn btn-warning impersonate_button' data-user-id='" + user.id + "'>\
                     <i class='fa fa-retweet'></i>\

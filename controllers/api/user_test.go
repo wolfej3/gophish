@@ -336,3 +336,34 @@ func TestModifyUserDisableTOTP(t *testing.T) {
 		t.Fatalf("expected recovery codes to be deleted, got %d", remaining)
 	}
 }
+
+// TestModifyUserUnlinkOIDC ensures that an admin can unlink a user's single
+// sign-on identity.
+func TestModifyUserUnlinkOIDC(t *testing.T) {
+	testCtx := setupTest(t)
+	user := createUnpriviledgedUser(t, models.RoleUser)
+	user.OIDCIdentity = "https://idp.example.com alice"
+	if err := models.PutUser(user); err != nil {
+		t.Fatalf("error linking user: %v", err)
+	}
+	put := func(unlink bool) {
+		body, _ := json.Marshal(userRequest{Username: user.Username, Role: user.Role.Slug, UnlinkOIDC: unlink})
+		r := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/users/%d", user.Id), bytes.NewBuffer(body))
+		r.Header.Set("Content-Type", "application/json")
+		r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", testCtx.apiKey))
+		w := httptest.NewRecorder()
+		testCtx.apiServer.ServeHTTP(w, r)
+		if w.Code != http.StatusOK {
+			t.Fatalf("unexpected error code received. expected %d got %d", http.StatusOK, w.Code)
+		}
+	}
+	// Saving other changes keeps the link
+	put(false)
+	if got, _ := models.GetUser(user.Id); got.OIDCIdentity == "" {
+		t.Fatal("expected the identity to stay linked")
+	}
+	put(true)
+	if got, _ := models.GetUser(user.Id); got.OIDCIdentity != "" {
+		t.Fatalf("expected the identity to be unlinked, got %q", got.OIDCIdentity)
+	}
+}
