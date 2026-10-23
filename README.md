@@ -9,6 +9,25 @@ Gophish: Open-Source Phishing Toolkit
 
 [Gophish](https://getgophish.com) is an open-source phishing toolkit designed for businesses and penetration testers. It provides the ability to quickly and easily setup and execute phishing engagements and security awareness training.
 
+### What's Changed
+
+This version modernizes Gophish and adds admin security features. The details are in the sections below.
+
+- **Security fixes:** stored XSS in the campaign results timeline (from visitors' User-Agent strings), locked accounts still working through API keys and existing sessions, HTML injection through Import Site, and a crash in Import Email. 71 known vulnerabilities in Go and dependencies are patched by moving to Go 1.26.
+- **Data layer:** gorm v2 and pressly/goose replace the unmaintained gorm v1 and liamstask/goose. Existing databases keep their migration history and upgrade in place. The test suite runs against MySQL as well as SQLite in CI.
+- **Single binary:** templates, admin assets, migrations, and the version are embedded, so Gophish runs from any directory. Building the admin assets only needs Go, not Node.js.
+- **Sessions:** admin sessions are stored in the database, survive restarts, and are revoked on logout, password change, and account lock.
+- **Admin security:** two-factor authentication, single sign-on through OIDC or SAML, an audit log, and API keys with limited permissions.
+
+#### Upgrading
+
+Back up your database first. Migrations run automatically when Gophish starts. Then note:
+
+- Everyone needs to log in again once, since sessions from the previous version aren't recognized.
+- The admin interface must be reached over HTTPS (see [Admin Server TLS](#admin-server-tls)). Over plain HTTP, every login is refused.
+- The `migrations_prefix` setting is no longer used, since migrations are embedded. It can be left in `config.json` or removed.
+- MySQL needs zero dates allowed (see [Database](#database)).
+
 ### Install
 
 Installation of Gophish is dead-simple - just download and extract the zip containing the [release for your system](https://github.com/gophish/gophish/releases/), and run the binary. Gophish has binary releases for Windows, Mac, and Linux platforms.
@@ -25,8 +44,18 @@ Two things are still read from disk, relative to the directory Gophish runs in:
 - `static/endpoint/`: files you want the phishing server to host.
 - `static/db/geolite2-city.mmdb`: the GeoIP database used to map recipients' IP addresses to locations. If it's missing, Gophish still records events but skips the location lookup.
 
+### Running the Tests
+
+`go test ./...` runs the test suite against an in-memory SQLite database. To run it against MySQL, point `GOPHISH_TEST_MYSQL_DSN` at a database Gophish can drop and recreate, and run the packages one at a time, since they share it:
+
+```
+GOPHISH_TEST_MYSQL_DSN='root:password@(127.0.0.1:3306)/gophish_test?charset=utf8&parseTime=True&loc=UTC' go test -p 1 ./...
+```
+
+The MySQL server needs the `sql_mode` described under [Database](#database).
+
 ### Docker
-You can also use Gophish via the official Docker container [here](https://hub.docker.com/r/gophish/gophish/).
+You can also use Gophish via the official Docker container [here](https://hub.docker.com/r/gophish/gophish/). The Docker build compiles the admin assets with Go, so it no longer needs a Node.js stage.
 
 ### Setup
 After running the Gophish binary, open an Internet browser to https://localhost:3333 and login with the default username and password listed in the log output.
@@ -36,6 +65,24 @@ time="2020-07-29T01:24:08Z" level=info msg="Please login with the username admin
 ```
 
 Releases of Gophish prior to v0.10.1 have a default username of `admin` and password of `gophish`.
+
+### Database
+
+Gophish uses SQLite by default, storing its data in the file named by `db_path` (`gophish.db`). To use MySQL instead, set `db_name` to `mysql` and `db_path` to a connection string:
+
+```json
+"db_name": "mysql",
+"db_path": "gophish:password@(127.0.0.1:3306)/gophish?charset=utf8&parseTime=True&loc=UTC",
+```
+
+Gophish stores zero dates, which MySQL's default strict mode rejects. Remove `NO_ZERO_DATE` and `NO_ZERO_IN_DATE` from the server's `sql_mode`, for example in `my.cnf`:
+
+```
+[mysqld]
+sql_mode=ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
+```
+
+Gophish is tested with MySQL 8.4.
 
 ### Admin Server TLS
 
@@ -53,6 +100,10 @@ In Docker, the admin server uses built-in TLS unless `ADMIN_USE_TLS=false` is se
 This applies only to the admin server. The phishing server's `use_tls` setting is unaffected.
 
 ### Admin Security
+
+#### Sessions
+
+Admin sessions are stored in the database, so restarting Gophish doesn't log anyone out. The session cookie holds only a random token, and the database stores a hash of it. Sessions last five days. Logging out ends the session. Changing a password signs the user out of their other sessions, and locking or deleting an account signs it out everywhere. Logging in always starts a new session.
 
 #### Two-factor authentication
 
