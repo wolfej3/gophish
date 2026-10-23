@@ -99,7 +99,21 @@ func RequireAPIKey(handler http.Handler) http.Handler {
 			JSONError(w, http.StatusUnauthorized, "API Key not set")
 			return
 		}
-		u, err := models.GetUserByAPIKey(ak)
+		// Scoped keys are looked up by their hash; full-access keys are
+		// stored on the user
+		var scoped *models.APIKey
+		var u models.User
+		var err error
+		if strings.HasPrefix(ak, models.ScopedAPIKeyPrefix) {
+			var k models.APIKey
+			k, err = models.GetAPIKeyByKey(ak)
+			if err == nil {
+				scoped = &k
+				u, err = models.GetUser(k.UserId)
+			}
+		} else {
+			u, err = models.GetUserByAPIKey(ak)
+		}
 		if err != nil {
 			JSONError(w, http.StatusUnauthorized, "Invalid API Key")
 			return
@@ -111,7 +125,35 @@ func RequireAPIKey(handler http.Handler) http.Handler {
 		r = ctx.Set(r, "user", u)
 		r = ctx.Set(r, "user_id", u.Id)
 		r = ctx.Set(r, "api_key", ak)
+		if scoped != nil {
+			r = ctx.Set(r, ScopedAPIKeyContextKey, *scoped)
+		}
 		handler.ServeHTTP(w, r)
+	})
+}
+
+// ScopedAPIKeyContextKey is the request context key holding the scoped API
+// key used to authenticate the request, if any.
+const ScopedAPIKeyContextKey = "scoped_api_key"
+
+// EnforceAPIKeyScope limits requests made with a scoped API key to the
+// resources and access level it was given. It must come after RequireAPIKey.
+// Requests made with a full-access key are unaffected. Either way, the
+// user's role still limits what they can do.
+func EnforceAPIKeyScope(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		k, ok := ctx.Get(r, ScopedAPIKeyContextKey).(models.APIKey)
+		if !ok {
+			next.ServeHTTP(w, r)
+			return
+		}
+		resource := strings.SplitN(strings.TrimPrefix(r.URL.Path, "/api/"), "/", 2)[0]
+		write := r.Method != http.MethodGet && r.Method != http.MethodHead
+		if !k.Allows(resource, write) {
+			JSONError(w, http.StatusForbidden, "This API key doesn't have access to this request")
+			return
+		}
+		next.ServeHTTP(w, r)
 	})
 }
 

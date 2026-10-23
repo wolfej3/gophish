@@ -99,7 +99,11 @@ func AuditAPIRequests(next http.Handler) http.Handler {
 		case rec.status >= 400:
 			action = models.AuditAPIRequestFailed
 		}
-		AuditUser(r, action, r.Method+" "+r.URL.Path, http.StatusText(rec.status))
+		details := http.StatusText(rec.status)
+		if k, ok := ctx.Get(r, ScopedAPIKeyContextKey).(models.APIKey); ok {
+			details += "; API key " + k.Prefix + " (" + k.Name + ")"
+		}
+		AuditUser(r, action, r.Method+" "+r.URL.Path, details)
 	})
 }
 

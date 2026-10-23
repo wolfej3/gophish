@@ -175,6 +175,10 @@ func DeleteUser(id int64) error {
 	if err != nil {
 		return err
 	}
+	err = DeleteUserAPIKeys(id)
+	if err != nil {
+		return err
+	}
 	// Sign the user out everywhere
 	err = DeleteUserSessions(id, "")
 	if err != nil {

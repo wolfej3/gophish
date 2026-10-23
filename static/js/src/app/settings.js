@@ -29,6 +29,99 @@ $(document).ready(function () {
         document.body.scrollTop = 0;
         document.documentElement.scrollTop = 0;
     }
+    // The resources a limited API key can be given access to
+    var apiKeyResources = {
+        campaigns: "Campaigns",
+        groups: "Users & Groups",
+        templates: "Email Templates",
+        pages: "Landing Pages",
+        smtp: "Sending Profiles",
+        import: "Importing emails and sites",
+        util: "Sending test emails",
+        imap: "Reporting (IMAP) settings",
+        users: "User management",
+        webhooks: "Webhooks",
+        audit_log: "Audit log",
+    }
+    $.each(apiKeyResources, function (slug, name) {
+        var id = "api_key_resource_" + slug
+        $("#api_key_resources").append(
+            $("<div class='checkbox checkbox-primary api-key-resource hidden'>")
+                .append($("<input type='checkbox'>").attr("id", id).val(slug))
+                .append($("<label>").attr("for", id).text(name))
+        )
+    })
+    $("#api_key_resource_all").change(function () {
+        $(".api-key-resource").toggleClass("hidden", this.checked)
+    })
+    var formatTime = function (t) {
+        return t ? moment(t).format('MMMM Do YYYY, h:mm a') : "Never"
+    }
+    var loadAPIKeys = function () {
+        api.apiKeys.get()
+            .success(function (keys) {
+                var body = $("#apiKeyTable tbody").empty()
+                $("#apiKeyTable").toggleClass("hidden", keys.length == 0)
+                $.each(keys, function (i, key) {
+                    var resources = key.resources == "*" ? "All" :
+                        key.resources.split(",").map(function (r) { return apiKeyResources[r] || r }).join(", ")
+                    body.append($("<tr>")
+                        .append($("<td>").text(key.name))
+                        .append($("<td>").append($("<code>").text(key.prefix + "…")))
+                        .append($("<td>").text(key.access == "write" ? "Read and write" : "Read only"))
+                        .append($("<td>").text(resources))
+                        .append($("<td>").text(key.last_used_at ? formatTime(key.last_used_at) : "Not yet"))
+                        .append($("<td>").text(formatTime(key.expires_at)))
+                        .append($("<td>").append(
+                            $("<button type='button' class='btn btn-danger btn-sm api-key-delete'><i class='fa fa-trash-o'></i></button>")
+                                .attr("data-key-id", key.id)
+                        )))
+                })
+            })
+            .error(function () {
+                errorFlash("Error fetching API keys")
+            })
+    }
+    $("#apiKeyForm").submit(function () {
+        var resources = []
+        if (!$("#api_key_resource_all").prop("checked")) {
+            $(".api-key-resource input:checked").each(function () {
+                resources.push($(this).val())
+            })
+            if (resources.length == 0) {
+                errorFlash("Choose at least one resource for the key")
+                return false
+            }
+        }
+        api.apiKeys.post({
+            name: $("#api_key_name").val(),
+            access: $("#api_key_access").val(),
+            resources: resources,
+            expires_in_days: parseInt($("#api_key_expires").val(), 10),
+        })
+            .success(function (data) {
+                $("#apiKeyCreatedValue").val(data.key)
+                $("#apiKeyCreated").removeClass("hidden")
+                $("#api_key_name").val("")
+                loadAPIKeys()
+            })
+            .error(function (data) {
+                errorFlash(data.responseJSON.message)
+            })
+        return false
+    })
+    $("#apiKeyTable").on("click", ".api-key-delete", function () {
+        api.apiKeyId.delete($(this).attr("data-key-id"))
+            .success(function (data) {
+                successFlash(data.message)
+                $("#apiKeyCreated").addClass("hidden")
+                loadAPIKeys()
+            })
+            .error(function (data) {
+                errorFlash(data.responseJSON.message)
+            })
+    })
+    loadAPIKeys()
     var showRecoveryCodes = function (codes) {
         $("#totpRecoveryList").text(codes.join("\n"))
         $("#totpRecoveryCodes").removeClass("hidden")

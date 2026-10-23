@@ -259,6 +259,19 @@ var api = {
             return query("/users/" + id, "DELETE", {}, true)
         }
     },
+    apiKeys: {
+        get: function () {
+            return query("/api_keys/", "GET", {}, false)
+        },
+        post: function (key) {
+            return query("/api_keys/", "POST", key, false)
+        },
+    },
+    apiKeyId: {
+        delete: function (id) {
+            return query("/api_keys/" + id, "DELETE", {}, false)
+        },
+    },
     auditLog: {
         get: function (params) {
             return query("/audit_log/?" + $.param(params), "GET", {}, false)

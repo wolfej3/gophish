@@ -85,6 +85,70 @@
             </form>
             <br />
             <hr />
+            <h3>Limited API Keys</h3>
+            <p>Give scripts and integrations a key that can only read, or only use some parts of the API.
+                A limited key can never do more than your account can. Each key is shown once, when it's created.</p>
+            <table class="table table-condensed" id="apiKeyTable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Key</th>
+                        <th>Access</th>
+                        <th>Resources</th>
+                        <th>Last Used</th>
+                        <th>Expires</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+            <form id="apiKeyForm">
+                <div class="row">
+                    <label for="api_key_name" class="col-sm-2 control-label form-label">Name:</label>
+                    <div class="col-md-6">
+                        <input type="text" id="api_key_name" class="form-control" placeholder="e.g. Reporting script" />
+                    </div>
+                </div>
+                <br />
+                <div class="row">
+                    <label for="api_key_access" class="col-sm-2 control-label form-label">Access:</label>
+                    <div class="col-md-6">
+                        <select id="api_key_access" class="form-control">
+                            <option value="read">Read only</option>
+                            <option value="write">Read and write</option>
+                        </select>
+                    </div>
+                </div>
+                <br />
+                <div class="row">
+                    <label class="col-sm-2 control-label form-label">Resources:</label>
+                    <div class="col-md-6" id="api_key_resources">
+                        <div class="checkbox checkbox-primary">
+                            <input id="api_key_resource_all" type="checkbox" value="*" checked>
+                            <label for="api_key_resource_all">All</label>
+                        </div>
+                    </div>
+                </div>
+                <br />
+                <div class="row">
+                    <label for="api_key_expires" class="col-sm-2 control-label form-label">Expires:</label>
+                    <div class="col-md-6">
+                        <select id="api_key_expires" class="form-control">
+                            <option value="30">In 30 days</option>
+                            <option value="90" selected>In 90 days</option>
+                            <option value="365">In a year</option>
+                            <option value="0">Never</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" type="submit"><i class="fa fa-plus"></i> Create Key</button>
+                </div>
+            </form>
+            <div id="apiKeyCreated" class="hidden">
+                <br />
+                <div class="alert alert-warning">Copy this key now. It won't be shown again.</div>
+                <input type="text" id="apiKeyCreatedValue" class="form-control" onclick="this.select();" readonly />
+            </div>
+            <hr />
             <h3>Two-Factor Authentication</h3>
             <div id="totpDisabled" {{if .User.TOTPEnabled}}class="hidden"{{end}}>
                 <p>Two-factor authentication is <strong>off</strong>. Turn it on to require a code from an
