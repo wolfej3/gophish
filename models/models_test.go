@@ -34,6 +34,7 @@ func (s *ModelsSuite) TearDownTest(c *check.C) {
 	for _, model := range []interface{}{
 		&Group{}, &Target{}, &GroupTarget{}, &SMTP{}, &Header{}, &Page{}, &Template{}, &Attachment{},
 		&Result{}, &Event{}, &MailLog{}, &Campaign{}, &Session{},
+		&Team{}, &TeamMember{},
 	} {
 		if err := cleanup.Delete(model).Error; err != nil {
 			panic(err)
@@ -45,6 +46,15 @@ func (s *ModelsSuite) TearDownTest(c *check.C) {
 		panic(err)
 	}
 	if err := db.Model(&User{}).Where("id = ?", 1).Update("username", "admin").Error; err != nil {
+		panic(err)
+	}
+	// Recreate the default team with the admin as an editor, as a fresh
+	// install would have.
+	team, err := GetDefaultTeam()
+	if err != nil {
+		panic(err)
+	}
+	if err := SetTeamMember(team.Id, 1, TeamRoleEditor); err != nil {
 		panic(err)
 	}
 }
@@ -59,6 +69,7 @@ func (s *ModelsSuite) createCampaignDependencies(ch *check.C, optional ...string
 		Target{BaseRecipient: BaseRecipient{Email: "test4@example.com", FirstName: "Second", LastName: "Example"}},
 	}
 	group.UserId = 1
+	group.TeamId = 1
 	ch.Assert(PostGroup(&group), check.Equals, nil)
 
 	// Add a template
@@ -71,23 +82,27 @@ func (s *ModelsSuite) createCampaignDependencies(ch *check.C, optional ...string
 	t.Text = "{{.RId}} - Text"
 	t.HTML = "{{.RId}} - HTML"
 	t.UserId = 1
+	t.TeamId = 1
 	ch.Assert(PostTemplate(&t), check.Equals, nil)
 
 	// Add a landing page
 	p := Page{Name: "Test Page"}
 	p.HTML = "<html>Test</html>"
 	p.UserId = 1
+	p.TeamId = 1
 	ch.Assert(PostPage(&p), check.Equals, nil)
 
 	// Add a sending profile
 	smtp := SMTP{Name: "Test Page"}
 	smtp.UserId = 1
+	smtp.TeamId = 1
 	smtp.Host = "example.com"
 	smtp.FromAddress = "test@test.com"
 	ch.Assert(PostSMTP(&smtp), check.Equals, nil)
 
 	c := Campaign{Name: "Test campaign"}
 	c.UserId = 1
+	c.TeamId = 1
 	c.Template = t
 	c.Page = p
 	c.SMTP = smtp
@@ -98,7 +113,7 @@ func (s *ModelsSuite) createCampaignDependencies(ch *check.C, optional ...string
 func (s *ModelsSuite) createCampaign(ch *check.C) Campaign {
 	c := s.createCampaignDependencies(ch)
 	// Setup and "launch" our campaign
-	ch.Assert(PostCampaign(&c, c.UserId), check.Equals, nil)
+	ch.Assert(PostCampaign(&c, c.UserId, 1), check.Equals, nil)
 
 	// For comparing the dates, we need to fetch the campaign again. This is
 	// to solve an issue where the campaign object right now has time down to
@@ -131,6 +146,7 @@ func resetBenchmark(b *testing.B) {
 	for _, model := range []interface{}{
 		&Group{}, &Target{}, &GroupTarget{}, &SMTP{}, &Header{}, &Page{}, &Template{}, &Attachment{},
 		&Result{}, &Event{}, &MailLog{}, &Campaign{}, &Session{},
+		&Team{}, &TeamMember{},
 	} {
 		if err := cleanup.Delete(model).Error; err != nil {
 			panic(err)
@@ -142,6 +158,15 @@ func resetBenchmark(b *testing.B) {
 		panic(err)
 	}
 	if err := db.Model(&User{}).Where("id = ?", 1).Update("username", "admin").Error; err != nil {
+		panic(err)
+	}
+	// Recreate the default team with the admin as an editor, as a fresh
+	// install would have.
+	team, err := GetDefaultTeam()
+	if err != nil {
+		panic(err)
+	}
+	if err := SetTeamMember(team.Id, 1, TeamRoleEditor); err != nil {
 		panic(err)
 	}
 }

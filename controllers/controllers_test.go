@@ -78,6 +78,7 @@ func createTestData(t *testing.T) {
 		models.Target{BaseRecipient: models.BaseRecipient{Email: "test2@example.com", FirstName: "Second", LastName: "Example"}},
 	}
 	group.UserId = 1
+	group.TeamId = 1
 	models.PostGroup(&group)
 
 	// Add a template
@@ -86,17 +87,20 @@ func createTestData(t *testing.T) {
 	template.Text = "Text text"
 	template.HTML = "<html>Test</html>"
 	template.UserId = 1
+	template.TeamId = 1
 	models.PostTemplate(&template)
 
 	// Add a landing page
 	p := models.Page{Name: "Test Page"}
 	p.HTML = "<html>Test</html>"
 	p.UserId = 1
+	p.TeamId = 1
 	models.PostPage(&p)
 
 	// Add a sending profile
 	smtp := models.SMTP{Name: "Test Page"}
 	smtp.UserId = 1
+	smtp.TeamId = 1
 	smtp.Host = "example.com"
 	smtp.FromAddress = "test@test.com"
 	models.PostSMTP(&smtp)
@@ -105,10 +109,11 @@ func createTestData(t *testing.T) {
 	// Set the status such that no emails are attempted
 	c := models.Campaign{Name: "Test campaign"}
 	c.UserId = 1
+	c.TeamId = 1
 	c.Template = template
 	c.Page = p
 	c.SMTP = smtp
 	c.Groups = []models.Group{group}
-	models.PostCampaign(&c, c.UserId)
+	models.PostCampaign(&c, c.UserId, 1)
 	c.UpdateStatus(models.CampaignEmailsSent)
 }

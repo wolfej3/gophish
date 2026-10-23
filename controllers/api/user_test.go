@@ -32,6 +32,14 @@ func createUnpriviledgedUser(t *testing.T, slug string) *models.User {
 	if err != nil {
 		t.Fatalf("error saving unpriviledged user: %v", err)
 	}
+	// Put the user on the default team so they can use team objects
+	team, err := models.GetDefaultTeam()
+	if err != nil {
+		t.Fatalf("error getting default team: %v", err)
+	}
+	if err := models.SetTeamMember(team.Id, unauthorizedUser.Id, models.TeamRoleEditor); err != nil {
+		t.Fatalf("error adding user to team: %v", err)
+	}
 	return unauthorizedUser
 }
 

@@ -12,6 +12,7 @@ func (s *ModelsSuite) TestPostGroup(c *check.C) {
 	g := Group{Name: "Test Group"}
 	g.Targets = []Target{Target{BaseRecipient: BaseRecipient{Email: "test@example.com"}}}
 	g.UserId = 1
+	g.TeamId = 1
 	err := PostGroup(&g)
 	c.Assert(err, check.Equals, nil)
 	c.Assert(g.Name, check.Equals, "Test Group")
@@ -22,6 +23,7 @@ func (s *ModelsSuite) TestPostGroupNoName(c *check.C) {
 	g := Group{Name: ""}
 	g.Targets = []Target{Target{BaseRecipient: BaseRecipient{Email: "test@example.com"}}}
 	g.UserId = 1
+	g.TeamId = 1
 	err := PostGroup(&g)
 	c.Assert(err, check.Equals, ErrGroupNameNotSpecified)
 }
@@ -30,6 +32,7 @@ func (s *ModelsSuite) TestPostGroupNoTargets(c *check.C) {
 	g := Group{Name: "No Target Group"}
 	g.Targets = []Target{}
 	g.UserId = 1
+	g.TeamId = 1
 	err := PostGroup(&g)
 	c.Assert(err, check.Equals, ErrNoTargetsSpecified)
 }
@@ -44,6 +47,7 @@ func (s *ModelsSuite) TestGetGroups(c *check.C) {
 			},
 		},
 		UserId: 1,
+		TeamId: 1,
 	})
 	PostGroup(&Group{
 		Name: "Test Group 2",
@@ -53,6 +57,7 @@ func (s *ModelsSuite) TestGetGroups(c *check.C) {
 			},
 		},
 		UserId: 1,
+		TeamId: 1,
 	})
 
 	// Get groups and test result.
@@ -83,6 +88,7 @@ func (s *ModelsSuite) TestGetGroup(c *check.C) {
 			},
 		},
 		UserId: 1,
+		TeamId: 1,
 	}
 	c.Assert(PostGroup(originalGroup), check.Equals, nil)
 
@@ -109,6 +115,7 @@ func (s *ModelsSuite) TestGetGroupByName(c *check.C) {
 			},
 		},
 		UserId: 1,
+		TeamId: 1,
 	})
 
 	// Get group and test result.
@@ -132,6 +139,7 @@ func (s *ModelsSuite) TestPutGroup(c *check.C) {
 		Target{BaseRecipient: BaseRecipient{Email: "test2@example.com", FirstName: "Second", LastName: "Example"}},
 	}
 	group.UserId = 1
+	group.TeamId = 1
 	PostGroup(&group)
 
 	// Update one of group's targets.
@@ -157,6 +165,7 @@ func (s *ModelsSuite) TestPutGroupEmptyAttribute(c *check.C) {
 		Target{BaseRecipient: BaseRecipient{Email: "test2@example.com", FirstName: "Second", LastName: "Example"}},
 	}
 	group.UserId = 1
+	group.TeamId = 1
 	PostGroup(&group)
 
 	// Update one of group's targets.

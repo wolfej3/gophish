@@ -32,6 +32,7 @@ func getFirstEmailRequest(t *testing.T) models.EmailRequest {
 		Page:          campaign.Page,
 		URL:           "http://localhost.localdomain",
 		UserId:        1,
+		TeamId:        1,
 		BaseRecipient: campaign.Results[0].BaseRecipient,
 		SMTP:          campaign.SMTP,
 		FromAddress:   campaign.SMTP.FromAddress,
@@ -369,6 +370,7 @@ func TestRedirectTemplating(t *testing.T) {
 		Name:        "Redirect Page",
 		HTML:        "<html>Test</html>",
 		UserId:      1,
+		TeamId:      1,
 		RedirectURL: "http://example.com/{{.RId}}",
 	}
 	err := models.PostPage(&p)
@@ -381,11 +383,12 @@ func TestRedirectTemplating(t *testing.T) {
 
 	campaign := models.Campaign{Name: "Redirect campaign"}
 	campaign.UserId = 1
+	campaign.TeamId = 1
 	campaign.Template = template
 	campaign.Page = p
 	campaign.SMTP = smtp
 	campaign.Groups = []models.Group{group}
-	err = models.PostCampaign(&campaign, campaign.UserId)
+	err = models.PostCampaign(&campaign, campaign.UserId, 1)
 	if err != nil {
 		t.Fatalf("error creating campaign: %v", err)
 	}

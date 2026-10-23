@@ -14,8 +14,10 @@ import (
 // Group contains the fields needed for a user -> group mapping
 // Groups contain 1..* Targets
 type Group struct {
-	Id           int64     `json:"id"`
-	UserId       int64     `json:"-"`
+	Id     int64 `json:"id"`
+	UserId int64 `json:"-"`
+	// TeamId is the team the object belongs to; UserId is who created it.
+	TeamId       int64     `json:"team_id" gorm:"column:team_id"`
 	Name         string    `json:"name"`
 	ModifiedDate time.Time `json:"modified_date"`
 	Targets      []Target  `json:"targets" gorm:"-"`
@@ -105,10 +107,10 @@ func (g *Group) Validate() error {
 	return nil
 }
 
-// GetGroups returns the groups owned by the given user.
-func GetGroups(uid int64) ([]Group, error) {
+// GetGroups returns the groups owned by the given team.
+func GetGroups(tid int64) ([]Group, error) {
 	gs := []Group{}
-	err := db.Where("user_id=?", uid).Find(&gs).Error
+	err := db.Where("team_id=?", tid).Find(&gs).Error
 	if err != nil {
 		log.Error(err)
 		return gs, err
@@ -123,10 +125,10 @@ func GetGroups(uid int64) ([]Group, error) {
 }
 
 // GetGroupSummaries returns the summaries for the groups
-// created by the given uid.
-func GetGroupSummaries(uid int64) (GroupSummaries, error) {
+// created by the given tid.
+func GetGroupSummaries(tid int64) (GroupSummaries, error) {
 	gs := GroupSummaries{}
-	query := db.Table("groups").Where("user_id=?", uid)
+	query := db.Table("groups").Where("team_id=?", tid)
 	err := query.Select("id, name, modified_date").Scan(&gs.Groups).Error
 	if err != nil {
 		log.Error(err)
@@ -143,10 +145,10 @@ func GetGroupSummaries(uid int64) (GroupSummaries, error) {
 	return gs, nil
 }
 
-// GetGroup returns the group, if it exists, specified by the given id and user_id.
-func GetGroup(id int64, uid int64) (Group, error) {
+// GetGroup returns the group, if it exists, specified by the given id and team_id.
+func GetGroup(id int64, tid int64) (Group, error) {
 	g := Group{}
-	err := db.Where("user_id=? and id=?", uid, id).Take(&g).Error
+	err := db.Where("team_id=? and id=?", tid, id).Take(&g).Error
 	if err != nil {
 		log.Error(err)
 		return g, err
@@ -159,9 +161,9 @@ func GetGroup(id int64, uid int64) (Group, error) {
 }
 
 // GetGroupSummary returns the summary for the requested group
-func GetGroupSummary(id int64, uid int64) (GroupSummary, error) {
+func GetGroupSummary(id int64, tid int64) (GroupSummary, error) {
 	g := GroupSummary{}
-	query := db.Table("groups").Where("user_id=? and id=?", uid, id)
+	query := db.Table("groups").Where("team_id=? and id=?", tid, id)
 	err := query.Select("id, name, modified_date").Take(&g).Error
 	if err != nil {
 		log.Error(err)
@@ -175,10 +177,10 @@ func GetGroupSummary(id int64, uid int64) (GroupSummary, error) {
 	return g, nil
 }
 
-// GetGroupByName returns the group, if it exists, specified by the given name and user_id.
-func GetGroupByName(n string, uid int64) (Group, error) {
+// GetGroupByName returns the group, if it exists, specified by the given name and team_id.
+func GetGroupByName(n string, tid int64) (Group, error) {
 	g := Group{}
-	err := db.Where("user_id=? and name=?", uid, n).Take(&g).Error
+	err := db.Where("team_id=? and name=?", tid, n).Take(&g).Error
 	if err != nil {
 		log.Error(err)
 		return g, err

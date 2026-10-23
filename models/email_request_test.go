@@ -226,6 +226,7 @@ func (s *ModelsSuite) TestPostSendTestEmailRequest(ch *check.C) {
 		Text:    "{{.Email}} - Text",
 		HTML:    "{{.Email}} - HTML",
 		UserId:  1,
+		TeamId:  1,
 	}
 	err := PostTemplate(&template)
 	ch.Assert(err, check.Equals, nil)
@@ -234,6 +235,7 @@ func (s *ModelsSuite) TestPostSendTestEmailRequest(ch *check.C) {
 		Name:   "Test Page",
 		HTML:   "test",
 		UserId: 1,
+		TeamId: 1,
 	}
 	err = PostPage(&page)
 	ch.Assert(err, check.Equals, nil)

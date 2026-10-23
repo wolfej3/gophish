@@ -18,16 +18,18 @@ const PreviewPrefix = "preview-"
 // to send a test email to test an SMTP connection.
 // This type implements the mailer.Mail interface.
 type EmailRequest struct {
-	Id          int64        `json:"-"`
-	Template    Template     `json:"template"`
-	TemplateId  int64        `json:"-"`
-	Page        Page         `json:"page"`
-	PageId      int64        `json:"-"`
-	SMTP        SMTP         `json:"smtp" gorm:"-"`
-	URL         string       `json:"url"`
-	Tracker     string       `json:"tracker" gorm:"-"`
-	TrackingURL string       `json:"tracking_url" gorm:"-"`
-	UserId      int64        `json:"-"`
+	Id          int64    `json:"-"`
+	Template    Template `json:"template"`
+	TemplateId  int64    `json:"-"`
+	Page        Page     `json:"page"`
+	PageId      int64    `json:"-"`
+	SMTP        SMTP     `json:"smtp" gorm:"-"`
+	URL         string   `json:"url"`
+	Tracker     string   `json:"tracker" gorm:"-"`
+	TrackingURL string   `json:"tracking_url" gorm:"-"`
+	UserId      int64    `json:"-"`
+	// TeamId is the team the object belongs to; UserId is who created it.
+	TeamId      int64        `json:"team_id" gorm:"column:team_id"`
 	ErrorChan   chan (error) `json:"-" gorm:"-"`
 	RId         string       `json:"id"`
 	FromAddress string       `json:"-"`

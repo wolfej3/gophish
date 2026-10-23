@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 
-	ctx "github.com/gophish/gophish/context"
 	log "github.com/gophish/gophish/logger"
 	"github.com/gophish/gophish/models"
 	"github.com/gorilla/mux"
@@ -17,7 +16,7 @@ import (
 func (as *Server) Campaigns(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == "GET":
-		cs, err := models.GetCampaigns(ctx.Get(r, "user_id").(int64))
+		cs, err := models.GetCampaigns(teamID(r))
 		if err != nil {
 			log.Error(err)
 		}
@@ -31,7 +30,7 @@ func (as *Server) Campaigns(w http.ResponseWriter, r *http.Request) {
 			JSONResponse(w, models.Response{Success: false, Message: "Invalid JSON structure"}, http.StatusBadRequest)
 			return
 		}
-		err = models.PostCampaign(&c, ctx.Get(r, "user_id").(int64))
+		err = models.PostCampaign(&c, userID(r), teamID(r))
 		if err != nil {
 			JSONResponse(w, models.Response{Success: false, Message: err.Error()}, http.StatusBadRequest)
 			return
@@ -49,7 +48,7 @@ func (as *Server) Campaigns(w http.ResponseWriter, r *http.Request) {
 func (as *Server) CampaignsSummary(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == "GET":
-		cs, err := models.GetCampaignSummaries(ctx.Get(r, "user_id").(int64))
+		cs, err := models.GetCampaignSummaries(teamID(r))
 		if err != nil {
 			log.Error(err)
 			JSONResponse(w, models.Response{Success: false, Message: err.Error()}, http.StatusInternalServerError)
@@ -64,7 +63,7 @@ func (as *Server) CampaignsSummary(w http.ResponseWriter, r *http.Request) {
 func (as *Server) Campaign(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, _ := strconv.ParseInt(vars["id"], 0, 64)
-	c, err := models.GetCampaign(id, ctx.Get(r, "user_id").(int64))
+	c, err := models.GetCampaign(id, teamID(r))
 	if err != nil {
 		log.Error(err)
 		JSONResponse(w, models.Response{Success: false, Message: "Campaign not found"}, http.StatusNotFound)
@@ -88,7 +87,7 @@ func (as *Server) Campaign(w http.ResponseWriter, r *http.Request) {
 func (as *Server) CampaignResults(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, _ := strconv.ParseInt(vars["id"], 0, 64)
-	cr, err := models.GetCampaignResults(id, ctx.Get(r, "user_id").(int64))
+	cr, err := models.GetCampaignResults(id, teamID(r))
 	if err != nil {
 		log.Error(err)
 		JSONResponse(w, models.Response{Success: false, Message: "Campaign not found"}, http.StatusNotFound)
@@ -106,7 +105,7 @@ func (as *Server) CampaignSummary(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(vars["id"], 0, 64)
 	switch {
 	case r.Method == "GET":
-		cs, err := models.GetCampaignSummary(id, ctx.Get(r, "user_id").(int64))
+		cs, err := models.GetCampaignSummary(id, teamID(r))
 		if err != nil {
 			if err == gorm.ErrRecordNotFound {
 				JSONResponse(w, models.Response{Success: false, Message: "Campaign not found"}, http.StatusNotFound)
@@ -127,7 +126,7 @@ func (as *Server) CampaignComplete(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(vars["id"], 0, 64)
 	switch {
 	case r.Method == "GET":
-		err := models.CompleteCampaign(id, ctx.Get(r, "user_id").(int64))
+		err := models.CompleteCampaign(id, teamID(r))
 		if err != nil {
 			JSONResponse(w, models.Response{Success: false, Message: "Error completing campaign"}, http.StatusInternalServerError)
 			return

@@ -11,8 +11,10 @@ import (
 
 // Page contains the fields used for a Page model
 type Page struct {
-	Id                 int64     `json:"id" gorm:"column:id; primary_key:yes"`
-	UserId             int64     `json:"-" gorm:"column:user_id"`
+	Id     int64 `json:"id" gorm:"column:id; primary_key:yes"`
+	UserId int64 `json:"-" gorm:"column:user_id"`
+	// TeamId is the team the object belongs to; UserId is who created it.
+	TeamId             int64     `json:"team_id" gorm:"column:team_id"`
 	Name               string    `json:"name"`
 	HTML               string    `json:"html" gorm:"column:html"`
 	CaptureCredentials bool      `json:"capture_credentials" gorm:"column:capture_credentials"`
@@ -88,10 +90,10 @@ func (p *Page) Validate() error {
 	return p.parseHTML()
 }
 
-// GetPages returns the pages owned by the given user.
-func GetPages(uid int64) ([]Page, error) {
+// GetPages returns the pages owned by the given team.
+func GetPages(tid int64) ([]Page, error) {
 	ps := []Page{}
-	err := db.Where("user_id=?", uid).Find(&ps).Error
+	err := db.Where("team_id=?", tid).Find(&ps).Error
 	if err != nil {
 		log.Error(err)
 		return ps, err
@@ -99,20 +101,20 @@ func GetPages(uid int64) ([]Page, error) {
 	return ps, err
 }
 
-// GetPage returns the page, if it exists, specified by the given id and user_id.
-func GetPage(id int64, uid int64) (Page, error) {
+// GetPage returns the page, if it exists, specified by the given id and team_id.
+func GetPage(id int64, tid int64) (Page, error) {
 	p := Page{}
-	err := db.Where("user_id=? and id=?", uid, id).Take(&p).Error
+	err := db.Where("team_id=? and id=?", tid, id).Take(&p).Error
 	if err != nil {
 		log.Error(err)
 	}
 	return p, err
 }
 
-// GetPageByName returns the page, if it exists, specified by the given name and user_id.
-func GetPageByName(n string, uid int64) (Page, error) {
+// GetPageByName returns the page, if it exists, specified by the given name and team_id.
+func GetPageByName(n string, tid int64) (Page, error) {
 	p := Page{}
-	err := db.Where("user_id=? and name=?", uid, n).Take(&p).Error
+	err := db.Where("team_id=? and name=?", tid, n).Take(&p).Error
 	if err != nil {
 		log.Error(err)
 	}
@@ -150,8 +152,8 @@ func PutPage(p *Page) error {
 
 // DeletePage deletes an existing page in the database.
 // An error is returned if a page with the given user id and page id is not found.
-func DeletePage(id int64, uid int64) error {
-	err := db.Where("user_id=?", uid).Delete(&Page{Id: id}).Error
+func DeletePage(id int64, tid int64) error {
+	err := db.Where("team_id=?", tid).Delete(&Page{Id: id}).Error
 	if err != nil {
 		log.Error(err)
 	}

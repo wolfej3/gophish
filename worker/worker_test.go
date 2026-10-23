@@ -51,6 +51,7 @@ func createTestData(t *testing.T, ctx *testContext) {
 				LastName:  "Example"}})
 	}
 	group.UserId = 1
+	group.TeamId = 1
 	models.PostGroup(&group)
 
 	// Add a template
@@ -59,17 +60,20 @@ func createTestData(t *testing.T, ctx *testContext) {
 	template.Text = "Text text"
 	template.HTML = "<html>Test</html>"
 	template.UserId = 1
+	template.TeamId = 1
 	models.PostTemplate(&template)
 
 	// Add a landing page
 	p := models.Page{Name: "Test Page"}
 	p.HTML = "<html>Test</html>"
 	p.UserId = 1
+	p.TeamId = 1
 	models.PostPage(&p)
 
 	// Add a sending profile
 	smtp := models.SMTP{Name: "Test Page"}
 	smtp.UserId = 1
+	smtp.TeamId = 1
 	smtp.Host = "example.com"
 	smtp.FromAddress = "test@test.com"
 	models.PostSMTP(&smtp)
@@ -80,6 +84,7 @@ func setupCampaign(id int) (*models.Campaign, error) {
 	// Set the status such that no emails are attempted
 	c := models.Campaign{Name: fmt.Sprintf("Test campaign - %d", id)}
 	c.UserId = 1
+	c.TeamId = 1
 	template, err := models.GetTemplate(1, 1)
 	if err != nil {
 		return nil, err
@@ -103,7 +108,7 @@ func setupCampaign(id int) (*models.Campaign, error) {
 		return nil, err
 	}
 	c.Groups = []models.Group{group}
-	err = models.PostCampaign(&c, c.UserId)
+	err = models.PostCampaign(&c, c.UserId, 1)
 	if err != nil {
 		return nil, err
 	}

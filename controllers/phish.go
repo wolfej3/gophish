@@ -220,7 +220,7 @@ func (ps *PhishingServer) PhishHandler(w http.ResponseWriter, r *http.Request) {
 			http.NotFound(w, r)
 			return
 		}
-		p, err := models.GetPage(preview.PageId, preview.UserId)
+		p, err := models.GetPage(preview.PageId, preview.TeamId)
 		if err != nil {
 			log.Error(err)
 			http.NotFound(w, r)
@@ -240,7 +240,7 @@ func (ps *PhishingServer) PhishHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p, err := models.GetPage(c.PageId, c.UserId)
+	p, err := models.GetPage(c.PageId, c.TeamId)
 	if err != nil {
 		log.Error(err)
 		http.NotFound(w, r)
@@ -350,7 +350,7 @@ func setupContext(r *http.Request) (*http.Request, error) {
 	if err != nil {
 		return r, err
 	}
-	c, err := models.GetCampaign(rs.CampaignId, rs.UserId)
+	c, err := models.GetCampaign(rs.CampaignId, rs.TeamId)
 	if err != nil {
 		log.Error(err)
 		return r, err

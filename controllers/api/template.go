@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	ctx "github.com/gophish/gophish/context"
 	log "github.com/gophish/gophish/logger"
 	"github.com/gophish/gophish/models"
 	"github.com/gorilla/mux"
@@ -17,7 +16,7 @@ import (
 func (as *Server) Templates(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == "GET":
-		ts, err := models.GetTemplates(ctx.Get(r, "user_id").(int64))
+		ts, err := models.GetTemplates(teamID(r))
 		if err != nil {
 			log.Error(err)
 		}
@@ -31,13 +30,14 @@ func (as *Server) Templates(w http.ResponseWriter, r *http.Request) {
 			JSONResponse(w, models.Response{Success: false, Message: "Invalid JSON structure"}, http.StatusBadRequest)
 			return
 		}
-		_, err = models.GetTemplateByName(t.Name, ctx.Get(r, "user_id").(int64))
+		_, err = models.GetTemplateByName(t.Name, teamID(r))
 		if err != gorm.ErrRecordNotFound {
 			JSONResponse(w, models.Response{Success: false, Message: "Template name already in use"}, http.StatusConflict)
 			return
 		}
 		t.ModifiedDate = time.Now().UTC()
-		t.UserId = ctx.Get(r, "user_id").(int64)
+		t.UserId = userID(r)
+		t.TeamId = teamID(r)
 		err = models.PostTemplate(&t)
 		if err == models.ErrTemplateNameNotSpecified {
 			JSONResponse(w, models.Response{Success: false, Message: err.Error()}, http.StatusBadRequest)
@@ -60,7 +60,7 @@ func (as *Server) Templates(w http.ResponseWriter, r *http.Request) {
 func (as *Server) Template(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, _ := strconv.ParseInt(vars["id"], 0, 64)
-	t, err := models.GetTemplate(id, ctx.Get(r, "user_id").(int64))
+	t, err := models.GetTemplate(id, teamID(r))
 	if err != nil {
 		JSONResponse(w, models.Response{Success: false, Message: "Template not found"}, http.StatusNotFound)
 		return
@@ -69,7 +69,7 @@ func (as *Server) Template(w http.ResponseWriter, r *http.Request) {
 	case r.Method == "GET":
 		JSONResponse(w, t, http.StatusOK)
 	case r.Method == "DELETE":
-		err = models.DeleteTemplate(id, ctx.Get(r, "user_id").(int64))
+		err = models.DeleteTemplate(id, teamID(r))
 		if err != nil {
 			JSONResponse(w, models.Response{Success: false, Message: "Error deleting template"}, http.StatusInternalServerError)
 			return
@@ -86,7 +86,8 @@ func (as *Server) Template(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		t.ModifiedDate = time.Now().UTC()
-		t.UserId = ctx.Get(r, "user_id").(int64)
+		t.UserId = userID(r)
+		t.TeamId = teamID(r)
 		err = models.PutTemplate(&t)
 		if err != nil {
 			JSONResponse(w, models.Response{Success: false, Message: err.Error()}, http.StatusBadRequest)

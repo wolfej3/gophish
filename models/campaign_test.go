@@ -12,7 +12,7 @@ func (s *ModelsSuite) TestGenerateSendDate(c *check.C) {
 	campaign := s.createCampaignDependencies(c)
 	// Test that if no launch date is provided, the campaign's creation date
 	// is used.
-	err := PostCampaign(&campaign, campaign.UserId)
+	err := PostCampaign(&campaign, campaign.UserId, 1)
 	c.Assert(err, check.Equals, nil)
 	c.Assert(campaign.LaunchDate, check.Equals, campaign.CreatedDate)
 
@@ -31,7 +31,7 @@ func (s *ModelsSuite) TestGenerateSendDate(c *check.C) {
 	// campaign's launch date
 	campaign = s.createCampaignDependencies(c)
 	campaign.LaunchDate = time.Now().UTC()
-	err = PostCampaign(&campaign, campaign.UserId)
+	err = PostCampaign(&campaign, campaign.UserId, 1)
 	c.Assert(err, check.Equals, nil)
 
 	campaign, _ = GetCampaign(campaign.Id, campaign.UserId)
@@ -47,7 +47,7 @@ func (s *ModelsSuite) TestGenerateSendDate(c *check.C) {
 	campaign = s.createCampaignDependencies(c)
 	campaign.LaunchDate = time.Now().UTC()
 	campaign.SendByDate = campaign.LaunchDate.Add(2 * time.Minute)
-	err = PostCampaign(&campaign, campaign.UserId)
+	err = PostCampaign(&campaign, campaign.UserId, 1)
 	c.Assert(err, check.Equals, nil)
 
 	campaign, _ = GetCampaign(campaign.Id, campaign.UserId)
@@ -108,7 +108,7 @@ func (s *ModelsSuite) TestLaunchCampaignMaillogStatus(c *check.C) {
 	campaign = s.createCampaignDependencies(c)
 	campaign.Name = "New Campaign"
 	campaign.LaunchDate = time.Now().Add(1 * time.Hour)
-	c.Assert(PostCampaign(&campaign, campaign.UserId), check.Equals, nil)
+	c.Assert(PostCampaign(&campaign, campaign.UserId, 1), check.Equals, nil)
 	ms, err = GetMailLogsByCampaign(campaign.Id)
 	c.Assert(err, check.Equals, nil)
 
@@ -159,6 +159,7 @@ func setupCampaignDependencies(b *testing.B, size int) {
 		group.Targets = append(group.Targets, Target{BaseRecipient: BaseRecipient{Email: fmt.Sprintf("test%d@example.com", i), FirstName: "User", LastName: fmt.Sprintf("%d", i)}})
 	}
 	group.UserId = 1
+	group.TeamId = 1
 	err := PostGroup(&group)
 	if err != nil {
 		b.Fatalf("error posting group: %v", err)
@@ -170,6 +171,7 @@ func setupCampaignDependencies(b *testing.B, size int) {
 	template.Text = "{{.RId}} - Text"
 	template.HTML = "{{.RId}} - HTML"
 	template.UserId = 1
+	template.TeamId = 1
 	err = PostTemplate(&template)
 	if err != nil {
 		b.Fatalf("error posting template: %v", err)
@@ -179,6 +181,7 @@ func setupCampaignDependencies(b *testing.B, size int) {
 	p := Page{Name: "Test Page"}
 	p.HTML = "<html>Test</html>"
 	p.UserId = 1
+	p.TeamId = 1
 	err = PostPage(&p)
 	if err != nil {
 		b.Fatalf("error posting page: %v", err)
@@ -187,6 +190,7 @@ func setupCampaignDependencies(b *testing.B, size int) {
 	// Add a sending profile
 	smtp := SMTP{Name: "Test Page"}
 	smtp.UserId = 1
+	smtp.TeamId = 1
 	smtp.Host = "example.com"
 	smtp.FromAddress = "test@test.com"
 	err = PostSMTP(&smtp)
@@ -201,11 +205,12 @@ func setupCampaign(b *testing.B, size int) Campaign {
 	setupCampaignDependencies(b, size)
 	campaign := Campaign{Name: "Test campaign"}
 	campaign.UserId = 1
+	campaign.TeamId = 1
 	campaign.Template = Template{Name: "Test Template"}
 	campaign.Page = Page{Name: "Test Page"}
 	campaign.SMTP = SMTP{Name: "Test Page"}
 	campaign.Groups = []Group{Group{Name: "Test Group"}}
-	PostCampaign(&campaign, 1)
+	PostCampaign(&campaign, 1, 1)
 	return campaign
 }
 
@@ -216,13 +221,14 @@ func BenchmarkCampaign100(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		campaign := Campaign{Name: "Test campaign"}
 		campaign.UserId = 1
+		campaign.TeamId = 1
 		campaign.Template = Template{Name: "Test Template"}
 		campaign.Page = Page{Name: "Test Page"}
 		campaign.SMTP = SMTP{Name: "Test Page"}
 		campaign.Groups = []Group{Group{Name: "Test Group"}}
 
 		b.StartTimer()
-		err := PostCampaign(&campaign, 1)
+		err := PostCampaign(&campaign, 1, 1)
 		if err != nil {
 			b.Fatalf("error posting campaign: %v", err)
 		}
@@ -241,13 +247,14 @@ func BenchmarkCampaign1000(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		campaign := Campaign{Name: "Test campaign"}
 		campaign.UserId = 1
+		campaign.TeamId = 1
 		campaign.Template = Template{Name: "Test Template"}
 		campaign.Page = Page{Name: "Test Page"}
 		campaign.SMTP = SMTP{Name: "Test Page"}
 		campaign.Groups = []Group{Group{Name: "Test Group"}}
 
 		b.StartTimer()
-		err := PostCampaign(&campaign, 1)
+		err := PostCampaign(&campaign, 1, 1)
 		if err != nil {
 			b.Fatalf("error posting campaign: %v", err)
 		}
@@ -266,13 +273,14 @@ func BenchmarkCampaign10000(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		campaign := Campaign{Name: "Test campaign"}
 		campaign.UserId = 1
+		campaign.TeamId = 1
 		campaign.Template = Template{Name: "Test Template"}
 		campaign.Page = Page{Name: "Test Page"}
 		campaign.SMTP = SMTP{Name: "Test Page"}
 		campaign.Groups = []Group{Group{Name: "Test Group"}}
 
 		b.StartTimer()
-		err := PostCampaign(&campaign, 1)
+		err := PostCampaign(&campaign, 1, 1)
 		if err != nil {
 			b.Fatalf("error posting campaign: %v", err)
 		}

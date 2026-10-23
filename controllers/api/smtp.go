@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	ctx "github.com/gophish/gophish/context"
 	log "github.com/gophish/gophish/logger"
 	"github.com/gophish/gophish/models"
 	"github.com/gorilla/mux"
@@ -17,7 +16,7 @@ import (
 func (as *Server) SendingProfiles(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == "GET":
-		ss, err := models.GetSMTPs(ctx.Get(r, "user_id").(int64))
+		ss, err := models.GetSMTPs(teamID(r))
 		if err != nil {
 			log.Error(err)
 		}
@@ -32,14 +31,15 @@ func (as *Server) SendingProfiles(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// Check to make sure the name is unique
-		_, err = models.GetSMTPByName(s.Name, ctx.Get(r, "user_id").(int64))
+		_, err = models.GetSMTPByName(s.Name, teamID(r))
 		if err != gorm.ErrRecordNotFound {
 			JSONResponse(w, models.Response{Success: false, Message: "SMTP name already in use"}, http.StatusConflict)
 			log.Error(err)
 			return
 		}
 		s.ModifiedDate = time.Now().UTC()
-		s.UserId = ctx.Get(r, "user_id").(int64)
+		s.UserId = userID(r)
+		s.TeamId = teamID(r)
 		err = models.PostSMTP(&s)
 		if err != nil {
 			JSONResponse(w, models.Response{Success: false, Message: err.Error()}, http.StatusInternalServerError)
@@ -54,7 +54,7 @@ func (as *Server) SendingProfiles(w http.ResponseWriter, r *http.Request) {
 func (as *Server) SendingProfile(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, _ := strconv.ParseInt(vars["id"], 0, 64)
-	s, err := models.GetSMTP(id, ctx.Get(r, "user_id").(int64))
+	s, err := models.GetSMTP(id, teamID(r))
 	if err != nil {
 		JSONResponse(w, models.Response{Success: false, Message: "SMTP not found"}, http.StatusNotFound)
 		return
@@ -63,7 +63,7 @@ func (as *Server) SendingProfile(w http.ResponseWriter, r *http.Request) {
 	case r.Method == "GET":
 		JSONResponse(w, s, http.StatusOK)
 	case r.Method == "DELETE":
-		err = models.DeleteSMTP(id, ctx.Get(r, "user_id").(int64))
+		err = models.DeleteSMTP(id, teamID(r))
 		if err != nil {
 			JSONResponse(w, models.Response{Success: false, Message: "Error deleting SMTP"}, http.StatusInternalServerError)
 			return
@@ -85,7 +85,8 @@ func (as *Server) SendingProfile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.ModifiedDate = time.Now().UTC()
-		s.UserId = ctx.Get(r, "user_id").(int64)
+		s.UserId = userID(r)
+		s.TeamId = teamID(r)
 		err = models.PutSMTP(&s)
 		if err != nil {
 			JSONResponse(w, models.Response{Success: false, Message: "Error updating page"}, http.StatusInternalServerError)

@@ -227,6 +227,16 @@ func Setup(c *config.Config) error {
 			log.Error(err)
 			return err
 		}
+		team, err := GetDefaultTeam()
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+		err = SetTeamMember(team.Id, adminUser.Id, TeamRoleEditor)
+		if err != nil {
+			log.Error(err)
+			return err
+		}
 	}
 	// If this is the first time the user is installing Gophish, then we will
 	// generate a temporary password for the admin user.

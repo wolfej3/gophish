@@ -32,8 +32,10 @@ func (d *Dialer) Dial() (mailer.Sender, error) {
 
 // SMTP contains the attributes needed to handle the sending of campaign emails
 type SMTP struct {
-	Id               int64     `json:"id" gorm:"column:id; primary_key:yes"`
-	UserId           int64     `json:"-" gorm:"column:user_id"`
+	Id     int64 `json:"id" gorm:"column:id; primary_key:yes"`
+	UserId int64 `json:"-" gorm:"column:user_id"`
+	// TeamId is the team the object belongs to; UserId is who created it.
+	TeamId           int64     `json:"team_id" gorm:"column:team_id"`
 	Interface        string    `json:"interface_type" gorm:"column:interface_type"`
 	Name             string    `json:"name"`
 	Host             string    `json:"host"`
@@ -138,10 +140,10 @@ func (s *SMTP) GetDialer() (mailer.Dialer, error) {
 	return &Dialer{d}, err
 }
 
-// GetSMTPs returns the SMTPs owned by the given user.
-func GetSMTPs(uid int64) ([]SMTP, error) {
+// GetSMTPs returns the SMTPs owned by the given team.
+func GetSMTPs(tid int64) ([]SMTP, error) {
 	ss := []SMTP{}
-	err := db.Where("user_id=?", uid).Find(&ss).Error
+	err := db.Where("team_id=?", tid).Find(&ss).Error
 	if err != nil {
 		log.Error(err)
 		return ss, err
@@ -156,10 +158,10 @@ func GetSMTPs(uid int64) ([]SMTP, error) {
 	return ss, nil
 }
 
-// GetSMTP returns the SMTP, if it exists, specified by the given id and user_id.
-func GetSMTP(id int64, uid int64) (SMTP, error) {
+// GetSMTP returns the SMTP, if it exists, specified by the given id and team_id.
+func GetSMTP(id int64, tid int64) (SMTP, error) {
 	s := SMTP{}
-	err := db.Where("user_id=? and id=?", uid, id).Take(&s).Error
+	err := db.Where("team_id=? and id=?", tid, id).Take(&s).Error
 	if err != nil {
 		log.Error(err)
 		return s, err
@@ -172,10 +174,10 @@ func GetSMTP(id int64, uid int64) (SMTP, error) {
 	return s, err
 }
 
-// GetSMTPByName returns the SMTP, if it exists, specified by the given name and user_id.
-func GetSMTPByName(n string, uid int64) (SMTP, error) {
+// GetSMTPByName returns the SMTP, if it exists, specified by the given name and team_id.
+func GetSMTPByName(n string, tid int64) (SMTP, error) {
 	s := SMTP{}
-	err := db.Where("user_id=? and name=?", uid, n).Take(&s).Error
+	err := db.Where("team_id=? and name=?", tid, n).Take(&s).Error
 	if err != nil {
 		log.Error(err)
 		return s, err
@@ -243,14 +245,14 @@ func PutSMTP(s *SMTP) error {
 
 // DeleteSMTP deletes an existing SMTP in the database.
 // An error is returned if a SMTP with the given user id and SMTP id is not found.
-func DeleteSMTP(id int64, uid int64) error {
+func DeleteSMTP(id int64, tid int64) error {
 	// Delete all custom headers
 	err := db.Where("smtp_id=?", id).Delete(&Header{}).Error
 	if err != nil {
 		log.Error(err)
 		return err
 	}
-	err = db.Where("user_id=?", uid).Delete(&SMTP{Id: id}).Error
+	err = db.Where("team_id=?", tid).Delete(&SMTP{Id: id}).Error
 	if err != nil {
 		log.Error(err)
 	}

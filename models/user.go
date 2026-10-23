@@ -3,8 +3,6 @@ package models
 import (
 	"errors"
 	"time"
-
-	log "github.com/gophish/gophish/logger"
 )
 
 // ErrModifyingOnlyAdmin occurs when there is an attempt to modify the only
@@ -130,7 +128,7 @@ func EnsureEnoughAdmins() error {
 
 // DeleteUser deletes the given user. To ensure that there is always at least
 // one user account with the Admin role, this function will refuse to delete
-// the last Admin.
+// the last Admin. Objects the user created stay with their teams.
 func DeleteUser(id int64) error {
 	existing, err := GetUser(id)
 	if err != nil {
@@ -143,65 +141,12 @@ func DeleteUser(id int64) error {
 			return err
 		}
 	}
-	campaigns, err := GetCampaigns(id)
+	// The user's campaigns, templates, and other objects belong to their
+	// teams, so they stay for the rest of the team. Only the user's own
+	// memberships go.
+	err = db.Where("user_id=?", id).Delete(&TeamMember{}).Error
 	if err != nil {
 		return err
-	}
-	// Delete the campaigns
-	log.Infof("Deleting campaigns for user ID %d", id)
-	for _, campaign := range campaigns {
-		err = DeleteCampaign(campaign.Id)
-		if err != nil {
-			return err
-		}
-	}
-	log.Infof("Deleting pages for user ID %d", id)
-	// Delete the landing pages
-	pages, err := GetPages(id)
-	if err != nil {
-		return err
-	}
-	for _, page := range pages {
-		err = DeletePage(page.Id, id)
-		if err != nil {
-			return err
-		}
-	}
-	// Delete the templates
-	log.Infof("Deleting templates for user ID %d", id)
-	templates, err := GetTemplates(id)
-	if err != nil {
-		return err
-	}
-	for _, template := range templates {
-		err = DeleteTemplate(template.Id, id)
-		if err != nil {
-			return err
-		}
-	}
-	// Delete the groups
-	log.Infof("Deleting groups for user ID %d", id)
-	groups, err := GetGroups(id)
-	if err != nil {
-		return err
-	}
-	for _, group := range groups {
-		err = DeleteGroup(&group)
-		if err != nil {
-			return err
-		}
-	}
-	// Delete the sending profiles
-	log.Infof("Deleting sending profiles for user ID %d", id)
-	profiles, err := GetSMTPs(id)
-	if err != nil {
-		return err
-	}
-	for _, profile := range profiles {
-		err = DeleteSMTP(profile.Id, id)
-		if err != nil {
-			return err
-		}
 	}
 	err = db.Where("user_id=?", id).Delete(&RecoveryCode{}).Error
 	if err != nil {

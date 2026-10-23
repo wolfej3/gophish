@@ -38,7 +38,7 @@ func (s *ModelsSuite) TestFormatAddress(c *check.C) {
 
 func (s *ModelsSuite) TestResultSendingStatus(ch *check.C) {
 	c := s.createCampaignDependencies(ch)
-	ch.Assert(PostCampaign(&c, c.UserId), check.Equals, nil)
+	ch.Assert(PostCampaign(&c, c.UserId, 1), check.Equals, nil)
 	// This campaign wasn't scheduled, so we expect the status to
 	// be sending
 	for _, r := range c.Results {
@@ -49,7 +49,7 @@ func (s *ModelsSuite) TestResultSendingStatus(ch *check.C) {
 func (s *ModelsSuite) TestResultScheduledStatus(ch *check.C) {
 	c := s.createCampaignDependencies(ch)
 	c.LaunchDate = time.Now().UTC().Add(time.Hour * time.Duration(1))
-	ch.Assert(PostCampaign(&c, c.UserId), check.Equals, nil)
+	ch.Assert(PostCampaign(&c, c.UserId, 1), check.Equals, nil)
 	// This campaign wasn't scheduled, so we expect the status to
 	// be sending
 	for _, r := range c.Results {
@@ -62,7 +62,7 @@ func (s *ModelsSuite) TestResultVariableStatus(ch *check.C) {
 	c := s.createCampaignDependencies(ch)
 	c.LaunchDate = time.Now().UTC()
 	c.SendByDate = c.LaunchDate.Add(2 * time.Minute)
-	ch.Assert(PostCampaign(&c, c.UserId), check.Equals, nil)
+	ch.Assert(PostCampaign(&c, c.UserId, 1), check.Equals, nil)
 
 	// The campaign has a window smaller than our group size, so we expect some
 	// emails to be sent immediately, while others will be scheduled
@@ -83,6 +83,7 @@ func (s *ModelsSuite) TestDuplicateResults(ch *check.C) {
 		Target{BaseRecipient: BaseRecipient{Email: "test2@example.com", FirstName: "Second", LastName: "Example"}},
 	}
 	group.UserId = 1
+	group.TeamId = 1
 	ch.Assert(PostGroup(&group), check.Equals, nil)
 
 	// Add a template
@@ -91,29 +92,33 @@ func (s *ModelsSuite) TestDuplicateResults(ch *check.C) {
 	t.Text = "{{.RId}} - Text"
 	t.HTML = "{{.RId}} - HTML"
 	t.UserId = 1
+	t.TeamId = 1
 	ch.Assert(PostTemplate(&t), check.Equals, nil)
 
 	// Add a landing page
 	p := Page{Name: "Test Page"}
 	p.HTML = "<html>Test</html>"
 	p.UserId = 1
+	p.TeamId = 1
 	ch.Assert(PostPage(&p), check.Equals, nil)
 
 	// Add a sending profile
 	smtp := SMTP{Name: "Test Page"}
 	smtp.UserId = 1
+	smtp.TeamId = 1
 	smtp.Host = "example.com"
 	smtp.FromAddress = "test@test.com"
 	ch.Assert(PostSMTP(&smtp), check.Equals, nil)
 
 	c := Campaign{Name: "Test campaign"}
 	c.UserId = 1
+	c.TeamId = 1
 	c.Template = t
 	c.Page = p
 	c.SMTP = smtp
 	c.Groups = []Group{group}
 
-	ch.Assert(PostCampaign(&c, c.UserId), check.Equals, nil)
+	ch.Assert(PostCampaign(&c, c.UserId, 1), check.Equals, nil)
 	ch.Assert(len(c.Results), check.Equals, 2)
 	ch.Assert(c.Results[0].Email, check.Equals, group.Targets[0].Email)
 	ch.Assert(c.Results[1].Email, check.Equals, group.Targets[2].Email)
