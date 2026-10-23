@@ -2,6 +2,10 @@
 <div class="container-fluid">
     <div class="row">
         <div class="col-sm-3 col-md-2 sidebar">
+            <div id="teamSwitcherGroup" class="form-group hidden" style="padding: 10px 15px 0;">
+                <label for="teamSwitcher" class="control-label" style="font-size: 11px; text-transform: uppercase; color: #777;">Team</label>
+                <select id="teamSwitcher" class="form-control input-sm"></select>
+            </div>
             <ul class="nav nav-sidebar">
                 <li>
                     <a href="/">Dashboard</a>
@@ -26,6 +30,9 @@
                 {{if .ModifySystem}}
                 <li>
                     <a href="/users">User Management<span class="nav-badge badge pull-right">Admin</span></a>
+                </li>
+                <li>
+                    <a href="/teams">Teams<span class="nav-badge badge pull-right">Admin</span></a>
                 </li>
                 <li>
                     <a href="/webhooks">Webhooks<span class="nav-badge badge pull-right">Admin</span></a>

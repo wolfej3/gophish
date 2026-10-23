@@ -45,6 +45,10 @@ function query(endpoint, method, data, async) {
         contentType: "application/json",
         beforeSend: function (xhr) {
             xhr.setRequestHeader('Authorization', 'Bearer ' + user.api_key);
+            var teamId = getCurrentTeamId();
+            if (teamId) {
+                xhr.setRequestHeader('X-Gophish-Team-Id', teamId);
+            }
         }
     })
 }
@@ -272,6 +276,31 @@ var api = {
             return query("/api_keys/" + id, "DELETE", {}, false)
         },
     },
+    teams: {
+        get: function () {
+            return query("/teams/", "GET", {}, false)
+        },
+        post: function (team) {
+            return query("/teams/", "POST", team, false)
+        },
+    },
+    teamId: {
+        put: function (team) {
+            return query("/teams/" + team.id, "PUT", team, false)
+        },
+        delete: function (id) {
+            return query("/teams/" + id, "DELETE", {}, false)
+        },
+        members: function (id) {
+            return query("/teams/" + id + "/members", "GET", {}, false)
+        },
+        addMember: function (id, member) {
+            return query("/teams/" + id + "/members", "POST", member, false)
+        },
+        removeMember: function (id, uid) {
+            return query("/teams/" + id + "/members/" + uid, "DELETE", {}, false)
+        },
+    },
     auditLog: {
         get: function (params) {
             return query("/audit_log/?" + $.param(params), "GET", {}, false)
@@ -317,6 +346,59 @@ var api = {
 }
 window.api = api
 
+// getCurrentTeamId returns the team the UI is acting in, remembered per
+// browser. Empty means "let the server pick my first team".
+function getCurrentTeamId() {
+    try {
+        return localStorage.getItem("gophish.teamId") || ""
+    } catch (e) {
+        return ""
+    }
+}
+window.getCurrentTeamId = getCurrentTeamId
+
+// setupTeamSwitcher fills the team dropdown in the sidebar and reloads the
+// page when a different team is chosen, so every table reflects it.
+function setupTeamSwitcher() {
+    var $switcher = $("#teamSwitcher")
+    if (!$switcher.length) {
+        return
+    }
+    api.teams.get()
+        .success(function (teams) {
+            // With one team there's nothing to switch, so hide the control.
+            if (!teams || teams.length <= 1) {
+                $("#teamSwitcherGroup").addClass("hidden")
+                return
+            }
+            var current = getCurrentTeamId()
+            var stillAMember = false
+            $switcher.empty()
+            $.each(teams, function (i, team) {
+                var selected = String(team.id) === current
+                if (selected) {
+                    stillAMember = true
+                }
+                $switcher.append($("<option>").val(team.id).text(team.name).prop("selected", selected))
+            })
+            // If the remembered team is gone, fall back to the first one.
+            if (!stillAMember) {
+                try {
+                    localStorage.setItem("gophish.teamId", String(teams[0].id))
+                } catch (e) {}
+                $switcher.val(teams[0].id)
+            }
+            $("#teamSwitcherGroup").removeClass("hidden")
+        })
+    $switcher.off("change").on("change", function () {
+        try {
+            localStorage.setItem("gophish.teamId", $(this).val())
+        } catch (e) {}
+        location.reload()
+    })
+}
+window.setupTeamSwitcher = setupTeamSwitcher
+
 // Register our moment.js datatables listeners
 $(document).ready(function () {
     // Setup nav highlighting
@@ -328,6 +410,7 @@ $(document).ready(function () {
             $this.addClass('active');
         }
     })
+    setupTeamSwitcher();
     $.fn.dataTable.moment('MMMM Do YYYY, h:mm:ss a');
     // Setup tooltips
     $('[data-toggle="tooltip"]').tooltip()

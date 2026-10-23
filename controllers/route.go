@@ -175,6 +175,7 @@ func (as *AdminServer) registerRoutes() {
 	router.HandleFunc("/settings/2fa/disable", mid.Use(as.DisableTOTP, as.limiter.Limit, mid.RequireLogin))
 	router.HandleFunc("/settings/2fa/recovery_codes", mid.Use(as.RegenerateRecoveryCodes, as.limiter.Limit, mid.RequireLogin))
 	router.HandleFunc("/users", mid.Use(as.UserManagement, mid.RequirePermission(models.PermissionModifySystem), mid.RequireLogin))
+	router.HandleFunc("/teams", mid.Use(as.TeamManagement, mid.RequirePermission(models.PermissionModifySystem), mid.RequireLogin))
 	router.HandleFunc("/webhooks", mid.Use(as.Webhooks, mid.RequirePermission(models.PermissionModifySystem), mid.RequireLogin))
 	router.HandleFunc("/audit_log", mid.Use(as.AuditLog, mid.RequirePermission(models.PermissionModifySystem), mid.RequireLogin))
 	router.HandleFunc("/impersonate", mid.Use(as.Impersonate, mid.RequirePermission(models.PermissionModifySystem), mid.RequireLogin))
@@ -409,6 +410,13 @@ func (as *AdminServer) Webhooks(w http.ResponseWriter, r *http.Request) {
 	params := newTemplateParams(r)
 	params.Title = "Webhooks"
 	getTemplate(w, "webhooks").ExecuteTemplate(w, "base", params)
+}
+
+// TeamManagement is an admin-only handler for managing teams and their members
+func (as *AdminServer) TeamManagement(w http.ResponseWriter, r *http.Request) {
+	params := newTemplateParams(r)
+	params.Title = "Teams"
+	getTemplate(w, "teams").ExecuteTemplate(w, "base", params)
 }
 
 // AuditLog is an admin-only handler that shows the audit log

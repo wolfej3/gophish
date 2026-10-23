@@ -68,6 +68,7 @@ var appScripts = []string{
 	"landing_pages.js",
 	"sending_profiles.js",
 	"settings.js",
+	"teams.js",
 	"templates.js",
 	"gophish.js",
 	"users.js",

@@ -1,0 +1,85 @@
+{{define "body"}}
+<div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
+    <h1 class="page-header">Teams</h1>
+    <div id="flashes" class="row"></div>
+    <p>Teams decide which users share which campaigns, templates, landing pages, groups, and sending profiles.
+        Editors can create and change a team's objects; viewers can only look at them.</p>
+    <div class="row">
+        <button type="button" class="btn btn-primary" id="new_button"><i class="fa fa-plus"></i> New Team</button>
+    </div>
+    &nbsp;
+    <div id="loading">
+        <i class="fa fa-spinner fa-spin fa-4x"></i>
+    </div>
+    <div class="row">
+        <table id="teamTable" class="table" style="display:none;">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Members</th>
+                    <th class="col-md-3 no-sort"></th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Team create/rename modal -->
+<div class="modal fade" id="modal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title" id="teamModalLabel">New Team</h4>
+            </div>
+            <div class="modal-body">
+                <div class="row" id="modal.flashes"></div>
+                <label class="control-label" for="name">Name:</label>
+                <div class="form-group">
+                    <input type="text" class="form-control" placeholder="Team name" id="name" autofocus />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="modalSubmit">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Members modal -->
+<div class="modal fade" id="membersModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title">Members of <span id="membersTeamName"></span></h4>
+            </div>
+            <div class="modal-body">
+                <div class="row" id="members.flashes"></div>
+                <table class="table table-condensed">
+                    <thead>
+                        <tr><th>User</th><th>Role</th><th></th></tr>
+                    </thead>
+                    <tbody id="membersBody"></tbody>
+                </table>
+                <hr />
+                <div class="form-inline">
+                    <select class="form-control" id="addMemberUser"></select>
+                    <select class="form-control" id="addMemberRole">
+                        <option value="editor">Editor</option>
+                        <option value="viewer">Viewer</option>
+                    </select>
+                    <button type="button" class="btn btn-primary" id="addMemberButton"><i class="fa fa-plus"></i> Add</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{{end}} {{define "scripts"}}
+<script src="/js/dist/app/teams.min.js"></script>
+{{end}}
