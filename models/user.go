@@ -26,6 +26,9 @@ type User struct {
 	TOTPSecret             string    `json:"-" gorm:"column:totp_secret"`
 	TOTPEnabled            bool      `json:"totp_enabled" gorm:"column:totp_enabled"`
 	TOTPLastStep           int64     `json:"-" gorm:"column:totp_last_step"`
+	// OIDCIdentity is the issuer and subject of the single sign-on identity
+	// linked to this account, if any.
+	OIDCIdentity string `json:"-" gorm:"column:oidc_identity"`
 }
 
 // GetUser returns the user that the given id corresponds to. If no user is found, an
@@ -48,6 +51,14 @@ func GetUsers() ([]User, error) {
 func GetUserByAPIKey(key string) (User, error) {
 	u := User{}
 	err := db.Preload("Role").Where("api_key = ?", key).First(&u).Error
+	return u, err
+}
+
+// GetUserByOIDCIdentity returns the user linked to the given single sign-on
+// identity. If no user is found, an error is thrown.
+func GetUserByOIDCIdentity(identity string) (User, error) {
+	u := User{}
+	err := db.Preload("Role").Where("oidc_identity = ?", identity).First(&u).Error
 	return u, err
 }
 

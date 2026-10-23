@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"html/template"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/gophish/gophish/auth"
@@ -45,7 +46,7 @@ func clearSecondFactor(session *sessions.Session) {
 // startSecondFactor records that the user has entered a correct password and
 // sends them to enter their two-factor code. They aren't logged in until they
 // do.
-func (as *AdminServer) startSecondFactor(w http.ResponseWriter, r *http.Request, u models.User) {
+func (as *AdminServer) startSecondFactor(w http.ResponseWriter, r *http.Request, u models.User, next string) {
 	session := ctx.Get(r, "session").(*sessions.Session)
 	err := mid.RegenerateSession(session)
 	if err != nil {
@@ -58,11 +59,11 @@ func (as *AdminServer) startSecondFactor(w http.ResponseWriter, r *http.Request,
 	session.Values[pendingTOTPExpiresKey] = time.Now().Add(secondFactorTimeout).Unix()
 	session.Values[pendingTOTPAttemptsKey] = 0
 	session.Save(r, w)
-	next := "/login/2fa"
-	if q := r.URL.RawQuery; q != "" {
-		next += "?" + q
+	target := "/login/2fa"
+	if next != "" {
+		target += "?" + url.Values{"next": {safeNext(next)}}.Encode()
 	}
-	http.Redirect(w, r, next, http.StatusFound)
+	http.Redirect(w, r, target, http.StatusFound)
 }
 
 // renderSecondFactor renders the page asking for a two-factor code.
@@ -133,7 +134,7 @@ func (as *AdminServer) LoginSecondFactor(w http.ResponseWriter, r *http.Request)
 			as.renderSecondFactor(w, r, http.StatusUnauthorized)
 			return
 		}
-		as.completeLogin(w, r, u)
+		as.completeLogin(w, r, u, r.FormValue("next"))
 	default:
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 	}

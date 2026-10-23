@@ -40,6 +40,7 @@ type AdminServer struct {
 	worker  worker.Worker
 	config  config.AdminServer
 	limiter *ratelimit.PostLimiter
+	oidc    *oidcClient
 }
 
 var defaultTLSConfig = &tls.Config{
@@ -93,6 +94,14 @@ func NewAdminServer(config config.AdminServer, options ...AdminServerOption) *Ad
 		limiter: defaultLimiter,
 		config:  config,
 	}
+	if config.OIDC != nil {
+		client, err := newOIDCClient(*config.OIDC)
+		if err != nil {
+			log.Errorf("single sign-on is disabled: %v", err)
+		} else {
+			as.oidc = client
+		}
+	}
 	for _, opt := range options {
 		opt(as)
 	}
@@ -138,6 +147,8 @@ func (as *AdminServer) registerRoutes() {
 	router.HandleFunc("/", mid.Use(as.Base, mid.RequireLogin))
 	router.HandleFunc("/login", mid.Use(as.Login, as.limiter.Limit))
 	router.HandleFunc("/login/2fa", mid.Use(as.LoginSecondFactor, as.limiter.Limit))
+	router.HandleFunc("/login/oidc", as.OIDCLogin)
+	router.HandleFunc("/login/oidc/callback", as.OIDCCallback)
 	router.HandleFunc("/logout", mid.Use(as.Logout, mid.RequireLogin))
 	router.HandleFunc("/reset_password", mid.Use(as.ResetPassword, mid.RequireLogin))
 	router.HandleFunc("/campaigns", mid.Use(as.Campaigns, mid.RequireLogin))
@@ -318,26 +329,51 @@ func (as *AdminServer) UserManagement(w http.ResponseWriter, r *http.Request) {
 }
 
 func (as *AdminServer) nextOrIndex(w http.ResponseWriter, r *http.Request) {
-	next := "/"
-	url, err := url.Parse(r.FormValue("next"))
+	redirectNext(w, r, r.FormValue("next"))
+}
+
+// safeNext returns the local path in next, or "/" if there isn't one. Only
+// the path is kept, so that next can't send the user to another site.
+func safeNext(next string) string {
+	url, err := url.Parse(next)
 	if err == nil {
 		path := url.EscapedPath()
 		if path != "" {
-			next = "/" + strings.TrimLeft(path, "/")
+			return "/" + strings.TrimLeft(path, "/")
 		}
 	}
-	http.Redirect(w, r, next, http.StatusFound)
+	return "/"
+}
+
+// redirectNext redirects the user to the local path in next, or to the
+// dashboard.
+func redirectNext(w http.ResponseWriter, r *http.Request, next string) {
+	http.Redirect(w, r, safeNext(next), http.StatusFound)
+}
+
+// loginParams are the template parameters for the login page.
+type loginParams struct {
+	User     models.User
+	Title    string
+	Flashes  []interface{}
+	Token    string
+	SSOLabel string
+	Next     string
+}
+
+func (as *AdminServer) newLoginParams(r *http.Request) loginParams {
+	return loginParams{
+		Title:    "Login",
+		Token:    csrf.Token(r),
+		SSOLabel: as.ssoLabel(),
+		Next:     r.FormValue("next"),
+	}
 }
 
 func (as *AdminServer) handleInvalidLogin(w http.ResponseWriter, r *http.Request, message string) {
 	session := ctx.Get(r, "session").(*sessions.Session)
 	Flash(w, r, "danger", message)
-	params := struct {
-		User    models.User
-		Title   string
-		Flashes []interface{}
-		Token   string
-	}{Title: "Login", Token: csrf.Token(r)}
+	params := as.newLoginParams(r)
 	params.Flashes = session.Flashes()
 	session.Save(r, w)
 	templates := template.New("template")
@@ -385,12 +421,7 @@ func (as *AdminServer) Impersonate(w http.ResponseWriter, r *http.Request) {
 // Login handles the authentication flow for a user. If credentials are valid,
 // a session is created
 func (as *AdminServer) Login(w http.ResponseWriter, r *http.Request) {
-	params := struct {
-		User    models.User
-		Title   string
-		Flashes []interface{}
-		Token   string
-	}{Title: "Login", Token: csrf.Token(r)}
+	params := as.newLoginParams(r)
 	session := ctx.Get(r, "session").(*sessions.Session)
 	switch {
 	case r.Method == "GET":
@@ -425,16 +456,16 @@ func (as *AdminServer) Login(w http.ResponseWriter, r *http.Request) {
 		// Users with two-factor authentication enabled have to provide a
 		// code before they're logged in
 		if u.TOTPEnabled {
-			as.startSecondFactor(w, r, u)
+			as.startSecondFactor(w, r, u, r.FormValue("next"))
 			return
 		}
-		as.completeLogin(w, r, u)
+		as.completeLogin(w, r, u, r.FormValue("next"))
 	}
 }
 
 // completeLogin logs in the user with a new session and redirects them to the
-// dashboard, or to the page they were trying to reach.
-func (as *AdminServer) completeLogin(w http.ResponseWriter, r *http.Request, u models.User) {
+// page in next, or to the dashboard.
+func (as *AdminServer) completeLogin(w http.ResponseWriter, r *http.Request, u models.User, next string) {
 	session := ctx.Get(r, "session").(*sessions.Session)
 	u.LastLogin = time.Now().UTC()
 	err := models.PutUser(&u)
@@ -456,7 +487,7 @@ func (as *AdminServer) completeLogin(w http.ResponseWriter, r *http.Request, u m
 	if err != nil {
 		log.Error(err)
 	}
-	as.nextOrIndex(w, r)
+	redirectNext(w, r, next)
 }
 
 // Logout destroys the current user session

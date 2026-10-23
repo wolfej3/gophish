@@ -16,6 +16,36 @@ type AdminServer struct {
 	CSRFKey              string   `json:"csrf_key"`
 	AllowedInternalHosts []string `json:"allowed_internal_hosts"`
 	TrustedOrigins       []string `json:"trusted_origins"`
+	OIDC                 *OIDC    `json:"oidc"`
+}
+
+// OIDC configures single sign-on to the admin server through an OpenID
+// Connect identity provider.
+type OIDC struct {
+	// Issuer is the identity provider's issuer URL, from which its
+	// configuration is discovered.
+	Issuer       string `json:"issuer"`
+	ClientID     string `json:"client_id"`
+	ClientSecret string `json:"client_secret"`
+	// RedirectURL is the admin server's callback URL registered with the
+	// identity provider, ending in /login/oidc/callback.
+	RedirectURL string `json:"redirect_url"`
+	// Scopes requested in addition to "openid". Defaults to "email" and
+	// "profile".
+	Scopes []string `json:"scopes"`
+	// UsernameClaim is the ID token claim matched against Gophish usernames.
+	// Defaults to "email".
+	UsernameClaim string `json:"username_claim"`
+	// ButtonLabel is the text of the sign in button on the login page.
+	// Defaults to "Sign in with SSO".
+	ButtonLabel string `json:"button_label"`
+	// AutoCreateUsers creates a Gophish account for people who sign in
+	// without one, with the role in DefaultRole.
+	AutoCreateUsers bool   `json:"auto_create_users"`
+	DefaultRole     string `json:"default_role"`
+	// AllowedDomains, if set, limits sign in to usernames ending in one of
+	// these email domains.
+	AllowedDomains []string `json:"allowed_domains"`
 }
 
 // PhishServer represents the Phish server configuration details
