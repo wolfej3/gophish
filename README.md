@@ -3,7 +3,7 @@
 Gophish
 =======
 
-![Build Status](https://github.com/wolfej3/gophish/workflows/CI/badge.svg) [![GoDoc](https://godoc.org/github.com/gophish/gophish?status.svg)](https://godoc.org/github.com/gophish/gophish)
+![Build Status](https://github.com/wolfej3/gophish/workflows/CI/badge.svg)
 
 Gophish: Open-Source Phishing Toolkit
 
@@ -32,12 +32,12 @@ Back up your database first. Migrations run automatically when Gophish starts. T
 
 ### Install
 
-Installation of Gophish is dead-simple - just download and extract the zip containing the [release for your system](https://github.com/gophish/gophish/releases/), and run the binary. Gophish has binary releases for Windows, Mac, and Linux platforms.
+Installation of Gophish is dead-simple - just download and extract the zip containing the [release for your system](https://github.com/wolfej3/gophish/releases/), and run the binary. Gophish has binary releases for Windows, Mac, and Linux platforms.
 
 ### Building From Source
 **If you are building from source, please note that Gophish requires Go v1.26 or above!** With Go's default toolchain settings, `go build` downloads the exact Go release pinned in `go.mod` automatically.
 
-To build Gophish from source, simply run ```git clone https://github.com/gophish/gophish.git``` and ```cd``` into the project source directory. Then, run ```go build```. After this, you should have a binary called ```gophish``` in the current directory.
+To build Gophish from source, simply run ```git clone https://github.com/wolfej3/gophish.git``` and ```cd``` into the project source directory. Then, run ```go build```. After this, you should have a binary called ```gophish``` in the current directory.
 
 The admin interface's HTML templates, CSS, JavaScript, fonts, and images, along with the database migrations, are embedded in the binary at build time. If you change any of them, rebuild with `go build` to see the change. If you change the JavaScript or CSS sources, run `go run ./tools/assets` first so the bundles in `static/js/dist` and `static/css/dist` are regenerated before they're embedded, and commit the regenerated bundles along with your change. Building the assets only needs Go; Node.js isn't required.
 
@@ -57,7 +57,7 @@ GOPHISH_TEST_MYSQL_DSN='root:password@(127.0.0.1:3306)/gophish_test?charset=utf8
 The MySQL server needs the `sql_mode` described under [Database](#database).
 
 ### Docker
-You can also use Gophish via the official Docker container [here](https://hub.docker.com/r/gophish/gophish/). The Docker build compiles the admin assets with Go, so it no longer needs a Node.js stage.
+This is a fork with additional security and feature changes (see [Security](#security)). The upstream `gophish/gophish` Docker image does not include these changes; build this fork's image yourself from the included `Dockerfile` (`docker build -t gophish .`). The Docker build compiles the admin assets with Go, so it no longer needs a Node.js stage.
 
 ### Setup
 After running the Gophish binary, open an Internet browser to https://localhost:3333 and login with the default username and password listed in the log output.
@@ -246,13 +246,36 @@ Gophish records logins and failed logins (with the reason and IP address), logou
 
 Each user's API key can do anything their account can. It's masked on **Account Settings**; revealing it takes re-entering your password (and a 2FA code if enabled), and it's no longer rendered into admin pages, so an XSS can't read it from the DOM. For scripts and integrations, users can also create limited keys there, or with `POST /api/api_keys/`. A limited key is read only or read and write, can be limited to some parts of the API (campaigns, groups, templates, landing pages, sending profiles, and so on), and can expire. Limited keys start with `gpk_`, are shown once when they're created, and are used the same way as the full key. A limited key can never do more than its owner's account, and it can't create or manage API keys. 
 
+### Security
+
+This fork addresses the following advisories against gophish v0.12.1, each with a regression test:
+
+| Advisory | Issue | Fix |
+|---|---|---|
+| CVE-2026-107271 | Rate-limit bypass / IP spoofing via `X-Forwarded-For` | Proxy headers honored only from `trusted_proxies`; none trusted by default |
+| CVE-2026-39904 | Zip-bomb attachments expand without limit | Per-entry/count/total caps; rejected at save time |
+| CVE-2025-70963 | Full API key rendered into every admin page | Admin UI uses the session cookie + CSRF; key masked behind a password-gated Reveal |
+| CVE-2026-107270 | Cross-team object access by ID | Verified 404 scoping across teams; creator preserved on update |
+| CVE-2026-107273 | SSRF in Import Site | Internal ranges blocked at dial time by default; timeouts, body cap, redirect cap, scheme check |
+| CVE-2026-82269 | API/session usable while password change required | Blocked for full keys, scoped keys, and sessions until changed |
+| (README) | Limited API key could change its owner's password | Scoped keys can't write user accounts |
+| CVE-2026-107272 | XSS via server/SMTP error messages | All flash/modal messages escaped |
+| CVE-2024-2211 | XSS via campaign name | Escaped in dashboard chart tooltips (tables already escaped) |
+| CVE-2026-107269 | Login timing username enumeration | Dummy bcrypt comparison on the no-such-user path |
+| CVE-2022-45003 | DoS via autofocus in a cloned site | `autofocus` stripped on import |
+| CVE-2022-45004 | XSS via a crafted landing page | Not applicable: landing-page HTML is never rendered in the admin origin |
+
+Additional hardening: credentials are never returned in API responses (encryption at rest is a follow-up); SSO won't auto-create admins without an explicit flag; LDAP refuses plaintext connections without TLS; rendered templates are size-capped; and admin responses carry `nosniff`, `Referrer-Policy`, CSP `frame-ancestors`, and `X-Frame-Options`.
+
+One upstream issue has no fix yet: [GO-2025-3884](https://pkg.go.dev/vuln/GO-2025-3884) in `gorilla/csrf` (`trusted_origins` ignores scheme), which only applies when `trusted_origins` is set — see [Admin Server TLS](#admin-server-tls).
+
 ### Documentation
 
 Documentation can be found on our [site](http://getgophish.com/documentation). Find something missing? Let us know by filing an issue!
 
 ### Issues
 
-Find a bug? Want more features? Find something missing in the documentation? Let us know! Please don't hesitate to [file an issue](https://github.com/gophish/gophish/issues/new) and we'll get right on it.
+Find a bug? Want more features? Find something missing in the documentation? Let us know! Please don't hesitate to [file an issue](https://github.com/wolfej3/gophish/issues/new) and we'll get right on it.
 
 ### License
 ```
