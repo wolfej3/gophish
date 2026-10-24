@@ -14,6 +14,7 @@ import (
 	"github.com/gophish/gophish/dialer"
 	log "github.com/gophish/gophish/logger"
 	"github.com/gophish/gophish/mailer"
+	"github.com/gophish/gophish/sender"
 	"gorm.io/gorm"
 )
 
@@ -45,7 +46,25 @@ type SMTP struct {
 	IgnoreCertErrors bool      `json:"ignore_cert_errors"`
 	Headers          []Header  `json:"headers"`
 	ModifiedDate     time.Time `json:"modified_date"`
+
+	// The following are used by the API-based transports (Microsoft Graph
+	// and Gmail) instead of Host/Username/Password. For those, FromAddress
+	// is the mailbox to send as.
+	TenantID        string `json:"tenant_id,omitempty" gorm:"column:tenant_id"`
+	ClientID        string `json:"client_id,omitempty" gorm:"column:client_id"`
+	ClientSecret    string `json:"client_secret,omitempty" gorm:"column:client_secret"`
+	CredentialsFile string `json:"credentials_file,omitempty" gorm:"column:credentials_file"`
 }
+
+// Sending profile interfaces (transports).
+const (
+	// SMTPInterface sends over SMTP (the default).
+	SMTPInterface = "SMTP"
+	// GraphInterface sends through the Microsoft Graph API.
+	GraphInterface = "Microsoft Graph"
+	// GmailInterface sends through the Gmail API.
+	GmailInterface = "Gmail"
+)
 
 // Header contains the fields and methods for a sending profile to have
 // custom headers
@@ -76,19 +95,44 @@ func (s SMTP) TableName() string {
 	return "smtp"
 }
 
+// ErrGraphCredentials is thrown when a Microsoft Graph profile is missing
+// its tenant, client, or secret.
+var ErrGraphCredentials = errors.New("Microsoft Graph profiles need a tenant ID, client ID, and client secret")
+
+// ErrGmailCredentials is thrown when a Gmail profile is missing its service
+// account credentials file.
+var ErrGmailCredentials = errors.New("Gmail profiles need a service account credentials file")
+
 // Validate ensures that SMTP configs/connections are valid
 func (s *SMTP) Validate() error {
-	switch {
-	case s.FromAddress == "":
+	if s.FromAddress == "" {
 		return ErrFromAddressNotSpecified
-	case s.Host == "":
-		return ErrHostNotSpecified
-	case !validateFromAddress(s.FromAddress):
+	}
+	if !validateFromAddress(s.FromAddress) {
 		return ErrInvalidFromAddress
 	}
-	_, err := mail.ParseAddress(s.FromAddress)
-	if err != nil {
+	if _, err := mail.ParseAddress(s.FromAddress); err != nil {
 		return err
+	}
+	switch s.Interface {
+	case GraphInterface:
+		if s.TenantID == "" || s.ClientID == "" || s.ClientSecret == "" {
+			return ErrGraphCredentials
+		}
+		return nil
+	case GmailInterface:
+		if s.CredentialsFile == "" {
+			return ErrGmailCredentials
+		}
+		return nil
+	}
+	return s.validateSMTP()
+}
+
+// validateSMTP validates the host for an SMTP sending profile.
+func (s *SMTP) validateSMTP() error {
+	if s.Host == "" {
+		return ErrHostNotSpecified
 	}
 	// Make sure addr is in host:port format
 	hp := strings.Split(s.Host, ":")
@@ -97,11 +141,10 @@ func (s *SMTP) Validate() error {
 	} else if len(hp) < 2 {
 		hp = append(hp, "25")
 	}
-	_, err = strconv.Atoi(hp[1])
-	if err != nil {
+	if _, err := strconv.Atoi(hp[1]); err != nil {
 		return ErrInvalidHost
 	}
-	return err
+	return nil
 }
 
 // validateFromAddress validates
@@ -110,8 +153,23 @@ func validateFromAddress(email string) bool {
 	return r.MatchString(email)
 }
 
-// GetDialer returns a dialer for the given SMTP profile
+// GetDialer returns a dialer for the given sending profile, choosing the
+// transport from the profile's interface type.
 func (s *SMTP) GetDialer() (mailer.Dialer, error) {
+	switch s.Interface {
+	case GraphInterface:
+		return sender.NewGraphDialer(sender.GraphConfig{
+			TenantID:     s.TenantID,
+			ClientID:     s.ClientID,
+			ClientSecret: s.ClientSecret,
+			From:         s.FromAddress,
+		})
+	case GmailInterface:
+		return sender.NewGmailDialer(sender.GmailConfig{
+			CredentialsFile: s.CredentialsFile,
+			From:            s.FromAddress,
+		})
+	}
 	// Setup the message and dial
 	hp := strings.Split(s.Host, ":")
 	if len(hp) < 2 {

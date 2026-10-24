@@ -41,6 +41,22 @@ function sendTestEmail() {
         })
 }
 
+// showTransportFields shows only the fields that apply to the chosen
+// interface type, and updates the "From" label.
+function showTransportFields(interfaceType) {
+    $(".transport-smtp, .transport-graph, .transport-gmail").addClass("hidden")
+    if (interfaceType === "Microsoft Graph") {
+        $(".transport-graph").removeClass("hidden")
+        $("#fromLabel").text("Send as")
+    } else if (interfaceType === "Gmail") {
+        $(".transport-gmail").removeClass("hidden")
+        $("#fromLabel").text("Send as")
+    } else {
+        $(".transport-smtp").removeClass("hidden")
+        $("#fromLabel").text("SMTP From")
+    }
+}
+
 // Save attempts to POST to /smtp/
 function save(idx) {
     var profile = {
@@ -59,6 +75,10 @@ function save(idx) {
     profile.username = $("#username").val()
     profile.password = $("#password").val()
     profile.ignore_cert_errors = $("#ignore_cert_errors").prop("checked")
+    profile.tenant_id = $("#tenant_id").val()
+    profile.client_id = $("#client_id").val()
+    profile.client_secret = $("#client_secret").val()
+    profile.credentials_file = $("#credentials_file").val()
     if (idx != -1) {
         profile.id = profiles[idx].id
         api.SMTPId.put(profile)
@@ -93,6 +113,8 @@ function dismiss() {
     $("#username").val("")
     $("#password").val("")
     $("#ignore_cert_errors").prop("checked", true)
+    $("#tenant_id, #client_id, #client_secret, #credentials_file").val("")
+    showTransportFields("SMTP")
     $("#headersTable").dataTable().DataTable().clear().draw()
     $("#modal").modal('hide')
 }
@@ -162,11 +184,17 @@ function edit(idx) {
         $("#username").val(profile.username)
         $("#password").val(profile.password)
         $("#ignore_cert_errors").prop("checked", profile.ignore_cert_errors)
+        $("#tenant_id").val(profile.tenant_id || "")
+        $("#client_id").val(profile.client_id || "")
+        $("#client_secret").val(profile.client_secret || "")
+        $("#credentials_file").val(profile.credentials_file || "")
+        showTransportFields(profile.interface_type || "SMTP")
         $.each(profile.headers, function (i, record) {
             addCustomHeader(record.key, record.value)
         });
     } else {
         $("#profileModalLabel").text("New Sending Profile")
+        showTransportFields("SMTP")
     }
 }
 
@@ -261,6 +289,10 @@ function addCustomHeader(header, value) {
 }
 
 $(document).ready(function () {
+    // Toggle transport-specific fields when the interface type changes
+    $("#interface_type").on("change", function () {
+        showTransportFields($(this).val())
+    })
     // Setup multiple modals
     // Code based on http://miles-by-motorcycle.com/static/bootstrap-modal/index.html
     $('.modal').on('hidden.bs.modal', function (event) {

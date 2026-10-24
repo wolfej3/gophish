@@ -121,3 +121,54 @@ func (s *ModelsSuite) TestDefaultDeniedDial(ch *check.C) {
 	_, err = d.Dial()
 	ch.Assert(err, check.ErrorMatches, ".*upstream connection denied.*")
 }
+
+func (s *ModelsSuite) TestSMTPTransportValidation(ch *check.C) {
+	// Graph needs tenant/client/secret
+	graph := SMTP{Name: "g", TeamId: 1, UserId: 1, Interface: GraphInterface, FromAddress: "a@b.com"}
+	ch.Assert(graph.Validate(), check.Equals, ErrGraphCredentials)
+	graph.TenantID, graph.ClientID, graph.ClientSecret = "t", "c", "s"
+	ch.Assert(graph.Validate(), check.Equals, nil)
+	// Graph doesn't require a host
+	ch.Assert(graph.Host, check.Equals, "")
+
+	// Gmail needs a credentials file
+	gmail := SMTP{Name: "m", TeamId: 1, UserId: 1, Interface: GmailInterface, FromAddress: "a@b.com"}
+	ch.Assert(gmail.Validate(), check.Equals, ErrGmailCredentials)
+	gmail.CredentialsFile = "/etc/gophish/sa.json"
+	ch.Assert(gmail.Validate(), check.Equals, nil)
+
+	// SMTP still requires a host
+	smtp := SMTP{Name: "s", TeamId: 1, UserId: 1, Interface: SMTPInterface, FromAddress: "a@b.com"}
+	ch.Assert(smtp.Validate(), check.Equals, ErrHostNotSpecified)
+	smtp.Host = "smtp.example.com:587"
+	ch.Assert(smtp.Validate(), check.Equals, nil)
+
+	// An empty interface is treated as SMTP
+	legacy := SMTP{Name: "l", TeamId: 1, UserId: 1, FromAddress: "a@b.com", Host: "smtp.example.com:25"}
+	ch.Assert(legacy.Validate(), check.Equals, nil)
+}
+
+func (s *ModelsSuite) TestSMTPGetDialerByInterface(ch *check.C) {
+	graph := SMTP{Interface: GraphInterface, FromAddress: "a@b.com", TenantID: "t", ClientID: "c", ClientSecret: "s"}
+	d, err := graph.GetDialer()
+	ch.Assert(err, check.Equals, nil)
+	ch.Assert(d, check.NotNil)
+
+	gmail := SMTP{Interface: GmailInterface, FromAddress: "a@b.com", CredentialsFile: "/nonexistent"}
+	_, err = gmail.GetDialer()
+	// The gmail dialer reads the credentials file at construction, so a
+	// missing file is an error here.
+	ch.Assert(err, check.NotNil)
+}
+
+func (s *ModelsSuite) TestSMTPTransportPersisted(ch *check.C) {
+	graph := SMTP{Name: "Graph Profile", TeamId: 1, UserId: 1, Interface: GraphInterface,
+		FromAddress: "a@b.com", TenantID: "tid", ClientID: "cid", ClientSecret: "secret"}
+	ch.Assert(PostSMTP(&graph), check.Equals, nil)
+	got, err := GetSMTP(graph.Id, 1)
+	ch.Assert(err, check.Equals, nil)
+	ch.Assert(got.Interface, check.Equals, GraphInterface)
+	ch.Assert(got.TenantID, check.Equals, "tid")
+	ch.Assert(got.ClientID, check.Equals, "cid")
+	ch.Assert(got.ClientSecret, check.Equals, "secret")
+}
