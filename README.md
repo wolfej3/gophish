@@ -244,7 +244,7 @@ Gophish records logins and failed logins (with the reason and IP address), logou
 
 #### Limited API keys
 
-Each user's API key can do anything their account can. It's masked on **Account Settings**; revealing it takes re-entering your password (and a 2FA code if enabled), and it's no longer rendered into admin pages, so an XSS can't read it from the DOM. For scripts and integrations, users can also create limited keys there, or with `POST /api/api_keys/`. A limited key is read only or read and write, can be limited to some parts of the API (campaigns, groups, templates, landing pages, sending profiles, and so on), and can expire. Limited keys start with `gpk_`, are shown once when they're created, and are used the same way as the full key. A limited key can never do more than its owner's account, and it can't create or manage API keys. Note that a key with write access to users can change its owner's password.
+Each user's API key can do anything their account can. It's masked on **Account Settings**; revealing it takes re-entering your password (and a 2FA code if enabled), and it's no longer rendered into admin pages, so an XSS can't read it from the DOM. For scripts and integrations, users can also create limited keys there, or with `POST /api/api_keys/`. A limited key is read only or read and write, can be limited to some parts of the API (campaigns, groups, templates, landing pages, sending profiles, and so on), and can expire. Limited keys start with `gpk_`, are shown once when they're created, and are used the same way as the full key. A limited key can never do more than its owner's account, and it can't create or manage API keys. 
 
 ### Documentation
 

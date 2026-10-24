@@ -84,6 +84,9 @@ func (as *Server) Users(w http.ResponseWriter, r *http.Request) {
 		JSONResponse(w, us, http.StatusOK)
 		return
 	case r.Method == "POST":
+		if denyScopedKeyUserWrite(w, r) {
+			return
+		}
 		ur := &userRequest{}
 		err := json.NewDecoder(r.Body).Decode(ur)
 		if err != nil {
@@ -150,6 +153,9 @@ func (as *Server) User(w http.ResponseWriter, r *http.Request) {
 	existingUser, err := models.GetUser(id)
 	if err != nil {
 		JSONResponse(w, models.Response{Success: false, Message: "User not found"}, http.StatusNotFound)
+		return
+	}
+	if r.Method != http.MethodGet && denyScopedKeyUserWrite(w, r) {
 		return
 	}
 	switch {
