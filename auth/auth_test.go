@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"time"
 	"testing"
 )
 
@@ -37,5 +38,15 @@ func TestValidatePasswordChange(t *testing.T) {
 	_, got = ValidatePasswordChange(currentHash, newPassword, confirmPassword)
 	if got != ErrReusedPassword {
 		t.Fatalf("unexpected error received. expected %v got %v", ErrReusedPassword, got)
+	}
+}
+
+func TestCompareDummyPasswordSpendsTime(t *testing.T) {
+	// The dummy comparison must do real bcrypt work so the no-such-user
+	// login path takes the same time as a wrong password.
+	start := time.Now()
+	CompareDummyPassword("anything")
+	if elapsed := time.Since(start); elapsed < 5*time.Millisecond {
+		t.Fatalf("dummy comparison returned too fast (%v); timing would leak username existence", elapsed)
 	}
 }

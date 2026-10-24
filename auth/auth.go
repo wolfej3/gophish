@@ -42,6 +42,18 @@ func GenerateSecureKey(n int) string {
 	return fmt.Sprintf("%x", k)
 }
 
+// dummyHash is a bcrypt hash of a random value at the default cost. It's
+// compared against during failed logins for unknown usernames so that login
+// timing doesn't reveal whether a username exists.
+var dummyHash, _ = bcrypt.GenerateFromPassword([]byte(GenerateSecureKey(16)), bcrypt.DefaultCost)
+
+// CompareDummyPassword runs a bcrypt comparison against a throwaway hash. Call
+// it on the no-such-user path so the response takes the same time as a wrong
+// password for an existing user.
+func CompareDummyPassword(password string) {
+	bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
+}
+
 // GeneratePasswordHash returns the bcrypt hash for the provided password using
 // the default bcrypt cost.
 func GeneratePasswordHash(password string) (string, error) {

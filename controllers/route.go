@@ -497,6 +497,9 @@ func (as *AdminServer) Login(w http.ResponseWriter, r *http.Request) {
 		u, err := models.GetUserByUsername(username)
 		if err != nil {
 			log.Error(err)
+			// Spend the same time as a real bcrypt comparison so an
+			// attacker can't tell existing usernames apart by timing.
+			auth.CompareDummyPassword(password)
 			mid.Audit(r, nil, username, models.AuditLoginFailed, "", "unknown username")
 			as.handleInvalidLogin(w, r, "Invalid Username/Password")
 			return
