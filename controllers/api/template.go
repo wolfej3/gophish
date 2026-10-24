@@ -39,6 +39,10 @@ func (as *Server) Templates(w http.ResponseWriter, r *http.Request) {
 		t.UserId = userID(r)
 		t.TeamId = teamID(r)
 		err = models.PostTemplate(&t)
+		if err == models.ErrAttachmentTooLarge {
+			JSONResponse(w, models.Response{Success: false, Message: err.Error()}, http.StatusBadRequest)
+			return
+		}
 		if err == models.ErrTemplateNameNotSpecified {
 			JSONResponse(w, models.Response{Success: false, Message: err.Error()}, http.StatusBadRequest)
 			return
