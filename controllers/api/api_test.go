@@ -34,6 +34,10 @@ func setupTest(t *testing.T) *testContext {
 	if err != nil {
 		t.Fatalf("error getting admin user: %v", err)
 	}
+	// A set-up admin has already changed the initial password; clear the
+	// flag so API requests aren't blocked (see the password-change tests).
+	u.PasswordChangeRequired = false
+	models.PutUser(&u)
 	ctx.apiKey = u.ApiKey
 	ctx.admin = u
 	ctx.apiServer = NewServer()

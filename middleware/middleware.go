@@ -117,6 +117,10 @@ func RequireAPIKey(handler http.Handler) http.Handler {
 			// Fall back to the browser's session cookie, which GetContext
 			// has already resolved to a user (completed login, unlocked).
 			if u, ok := ctx.Get(r, "user").(models.User); ok {
+				if u.PasswordChangeRequired {
+					JSONError(w, http.StatusForbidden, "Password change required")
+					return
+				}
 				r = ctx.Set(r, "user_id", u.Id)
 				r = ctx.Set(r, AuthMethodContextKey, AuthMethodSession)
 				handler.ServeHTTP(w, r)
@@ -146,6 +150,12 @@ func RequireAPIKey(handler http.Handler) http.Handler {
 		}
 		if u.AccountLocked {
 			JSONError(w, http.StatusUnauthorized, "Account Locked")
+			return
+		}
+		// A user flagged to change their password can't use the API (full
+		// or scoped key) until they do; they change it through the admin UI.
+		if u.PasswordChangeRequired {
+			JSONError(w, http.StatusForbidden, "Password change required")
 			return
 		}
 		r = ctx.Set(r, "user", u)
