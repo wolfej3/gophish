@@ -183,6 +183,7 @@ func (as *AdminServer) registerRoutes() {
 	api := api.NewServer(
 		api.WithWorker(as.worker),
 		api.WithLimiter(as.limiter),
+		api.WithDirectoryConnectors(as.config.Directory),
 	)
 	router.PathPrefix("/api/").Handler(api)
 

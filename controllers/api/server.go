@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 
+	"github.com/gophish/gophish/config"
 	mid "github.com/gophish/gophish/middleware"
 	"github.com/gophish/gophish/middleware/ratelimit"
 	"github.com/gophish/gophish/models"
@@ -18,9 +19,10 @@ type ServerOption func(*Server)
 // stopped. Rather, it's meant to be used as an http.Handler in the
 // AdminServer.
 type Server struct {
-	handler http.Handler
-	worker  worker.Worker
-	limiter *ratelimit.PostLimiter
+	handler   http.Handler
+	worker    worker.Worker
+	limiter   *ratelimit.PostLimiter
+	directory []config.DirectoryConnector
 }
 
 // NewServer returns a new instance of the API handler with the provided
@@ -43,6 +45,13 @@ func NewServer(options ...ServerOption) *Server {
 func WithWorker(w worker.Worker) ServerOption {
 	return func(as *Server) {
 		as.worker = w
+	}
+}
+
+// WithDirectoryConnectors sets the directory connectors groups can sync from.
+func WithDirectoryConnectors(connectors []config.DirectoryConnector) ServerOption {
+	return func(as *Server) {
+		as.directory = connectors
 	}
 }
 
@@ -74,6 +83,9 @@ func (as *Server) registerRoutes() {
 	router.HandleFunc("/groups/summary", as.GroupsSummary)
 	router.HandleFunc("/groups/{id:[0-9]+}", as.Group)
 	router.HandleFunc("/groups/{id:[0-9]+}/summary", as.GroupSummary)
+	router.HandleFunc("/groups/{id:[0-9]+}/source", as.GroupSource)
+	router.HandleFunc("/groups/{id:[0-9]+}/sync", as.GroupSync)
+	router.HandleFunc("/directory/connectors", as.DirectoryConnectors)
 	router.HandleFunc("/templates/", as.Templates)
 	router.HandleFunc("/templates/{id:[0-9]+}", as.Template)
 	router.HandleFunc("/pages/", as.Pages)

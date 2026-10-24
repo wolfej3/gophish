@@ -133,10 +133,27 @@ var api = {
         }
     },
     // groupId contains the endpoints for /groups/:id
+    directory: {
+        connectors: function () {
+            return query("/directory/connectors", "GET", {}, false)
+        },
+    },
     groupId: {
         // get() - Queries the API for GET /groups/:id
         get: function (id) {
             return query("/groups/" + id, "GET", {}, false)
+        },
+        getSource: function (id) {
+            return query("/groups/" + id + "/source", "GET", {}, false)
+        },
+        setSource: function (id, source) {
+            return query("/groups/" + id + "/source", "PUT", source, false)
+        },
+        deleteSource: function (id) {
+            return query("/groups/" + id + "/source", "DELETE", {}, false)
+        },
+        sync: function (id) {
+            return query("/groups/" + id + "/sync", "POST", {}, false)
         },
         // put() - Puts a group to PUT /groups/:id
         put: function (group) {

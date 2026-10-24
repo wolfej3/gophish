@@ -18,6 +18,61 @@ type AdminServer struct {
 	TrustedOrigins       []string `json:"trusted_origins"`
 	OIDC                 *OIDC    `json:"oidc"`
 	SAML                 *SAML    `json:"saml"`
+	// Directory lists connectors that groups can sync their members from.
+	Directory []DirectoryConnector `json:"directory"`
+}
+
+// DirectoryConnector holds the credentials for syncing group members from an
+// identity directory. Secrets live here, in config.json, rather than in the
+// database; groups reference a connector by name.
+type DirectoryConnector struct {
+	// Name identifies the connector to the admin interface and to groups
+	// that sync from it.
+	Name string `json:"name"`
+	// Provider is "msgraph" (Microsoft Entra ID), "google" (Google
+	// Workspace), or "ldap" (any LDAP directory, including Active
+	// Directory).
+	Provider string `json:"provider"`
+
+	// Microsoft Entra ID (msgraph)
+	TenantID     string `json:"tenant_id"`
+	ClientID     string `json:"client_id"`
+	ClientSecret string `json:"client_secret"`
+
+	// Google Workspace (google). CredentialsFile is a service account key
+	// with domain-wide delegation; DelegatedSubject is the admin whose
+	// access it borrows.
+	CredentialsFile  string `json:"credentials_file"`
+	DelegatedSubject string `json:"delegated_subject"`
+
+	// LDAP / Active Directory (ldap). URL is the server, e.g.
+	// ldaps://dc.example.com:636. BindDN and BindPassword authenticate the
+	// account Gophish searches with. BaseDN is where searches start.
+	URL          string `json:"url"`
+	BindDN       string `json:"bind_dn"`
+	BindPassword string `json:"bind_password"`
+	BaseDN       string `json:"base_dn"`
+	// UserFilter finds the members of a directory group. %s is replaced with
+	// the group named by a source's external_id. It defaults to the
+	// Active Directory filter
+	// (&(objectClass=user)(memberOf=%s)), so external_id is the group's DN.
+	UserFilter string `json:"user_filter"`
+	// The attributes read from each user. They default to the Active
+	// Directory names: mail, givenName, sn.
+	EmailAttribute     string `json:"email_attribute"`
+	FirstNameAttribute string `json:"first_name_attribute"`
+	LastNameAttribute  string `json:"last_name_attribute"`
+	// StartTLS upgrades a plain ldap:// connection to TLS. InsecureTLS skips
+	// certificate verification (for self-signed lab certs; avoid in
+	// production).
+	StartTLS    bool `json:"start_tls"`
+	InsecureTLS bool `json:"insecure_tls"`
+
+	// BaseURL overrides the directory API's base address, for self-hosted
+	// endpoints or testing. Empty uses the provider's public endpoint.
+	BaseURL string `json:"base_url"`
+	// TokenURL overrides the OAuth token endpoint, for the same reasons.
+	TokenURL string `json:"token_url"`
 }
 
 // SAML configures single sign-on to the admin server through a SAML 2.0

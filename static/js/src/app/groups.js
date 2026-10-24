@@ -1,3 +1,5 @@
+var editingGroupId = -1
+function currentGroupId() { return editingGroupId }
 var groups = []
 
 // Save attempts to POST or PUT to /groups/
@@ -46,6 +48,73 @@ function save(id) {
     }
 }
 
+// Directory sync UI. The panel appears only when the server has directory
+// connectors configured and the group already exists (it needs an id).
+var directoryConnectors = []
+
+var hintForProvider = function (provider) {
+    switch (provider) {
+        case "msgraph": return "The Entra ID group's object ID."
+        case "google": return "The Google Workspace group's email address."
+        case "ldap": return "The group's distinguished name, e.g. CN=Sales,OU=Groups,DC=example,DC=com."
+        default: return ""
+    }
+}
+
+var updateDirectoryHint = function () {
+    var conn = directoryConnectors.find(function (c) { return c.name === $("#directoryConnector").val() })
+    $("#directoryExternalHint").text(conn ? hintForProvider(conn.provider) : "")
+}
+
+var renderSyncStatus = function (source) {
+    if (!source) {
+        $("#directorySyncStatus").text("")
+        $("#removeSourceButton").addClass("hidden")
+        return
+    }
+    $("#removeSourceButton").removeClass("hidden")
+    var msg = source.last_synced_at ?
+        "Last synced " + moment(source.last_synced_at).fromNow() : "Not synced yet"
+    if (source.last_error) {
+        msg += " — last error: " + source.last_error
+    }
+    $("#directorySyncStatus").text(msg)
+}
+
+var setupDirectorySync = function (id) {
+    $("#directorySyncPanel").addClass("hidden")
+    $("#directoryExternalId").val("")
+    $("#directorySyncStatus").text("")
+    $("#removeSourceButton").addClass("hidden")
+    // New groups can't sync until they're saved and reopened.
+    if (id === -1) {
+        return
+    }
+    api.directory.connectors()
+        .success(function (connectors) {
+            if (!connectors || connectors.length === 0) {
+                return
+            }
+            directoryConnectors = connectors
+            var select = $("#directoryConnector").empty()
+            $.each(connectors, function (i, c) {
+                select.append($("<option>").val(c.name).text(c.name + " (" + c.provider + ")"))
+            })
+            $("#directorySyncPanel").removeClass("hidden")
+            updateDirectoryHint()
+            // Load an existing source, if any
+            api.groupId.getSource(id)
+                .success(function (source) {
+                    $("#directoryConnector").val(source.connector)
+                    $("#directoryExternalId").val(source.external_id)
+                    updateDirectoryHint()
+                    renderSyncStatus(source)
+                })
+                .error(function () { /* no source yet */ })
+        })
+        .error(function () { /* directory sync not configured */ })
+}
+
 function dismiss() {
     $("#targetsTable").dataTable().DataTable().clear().draw()
     $("#name").val("")
@@ -53,6 +122,8 @@ function dismiss() {
 }
 
 function edit(id) {
+    editingGroupId = id
+    setupDirectorySync(id)
     targets = $("#targetsTable").dataTable({
         destroy: true, // Destroy any other instantiated table - http://datatables.net/manual/tech-notes/3#destroy
         columnDefs: [{
@@ -259,7 +330,61 @@ function load() {
         })
 }
 
+// reloadTargetsFromGroup refreshes the targets table from a group object.
+function reloadTargetsFromGroup(group) {
+    var table = $("#targetsTable").DataTable()
+    table.clear()
+    var rows = []
+    $.each(group.targets, function (i, record) {
+        rows.push([
+            escapeHtml(record.first_name),
+            escapeHtml(record.last_name),
+            escapeHtml(record.email),
+            escapeHtml(record.position),
+            '<span style="cursor:pointer;"><i class="fa fa-trash-o"></i></span>'
+        ])
+    })
+    table.rows.add(rows).draw()
+}
+
 $(document).ready(function () {
+    $("#directoryConnector").on("change", updateDirectoryHint)
+    $("#saveSourceButton").on("click", function () {
+        var id = currentGroupId()
+        if (id === -1) { return }
+        api.groupId.setSource(id, {
+            connector: $("#directoryConnector").val(),
+            external_id: $("#directoryExternalId").val()
+        })
+            .success(function (source) {
+                successFlashFade("Directory source saved", 2)
+                renderSyncStatus(source)
+            })
+            .error(function (data) { modalError(data.responseJSON.message) })
+    })
+    $("#removeSourceButton").on("click", function () {
+        var id = currentGroupId()
+        if (id === -1) { return }
+        api.groupId.deleteSource(id)
+            .success(function () {
+                successFlashFade("Directory sync removed", 2)
+                renderSyncStatus(null)
+            })
+            .error(function (data) { modalError(data.responseJSON.message) })
+    })
+    $("#syncNowButton").on("click", function () {
+        var id = currentGroupId()
+        if (id === -1) { return }
+        var $btn = $(this).prop("disabled", true)
+        api.groupId.sync(id)
+            .success(function (group) {
+                reloadTargetsFromGroup(group)
+                api.groupId.getSource(id).success(renderSyncStatus)
+                successFlash("Synced " + group.targets.length + " members from the directory")
+            })
+            .error(function (data) { modalError(data.responseJSON.message) })
+            .always(function () { $btn.prop("disabled", false) })
+    })
     load()
     // Setup the event listeners
     // Handle manual additions

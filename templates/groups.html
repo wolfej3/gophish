@@ -61,6 +61,26 @@
                     <span id="csv-template" class="text-muted small">
                         <i class="fa fa-file-excel-o"></i> Download CSV Template</span>
                 </div>
+                <div class="panel panel-default hidden" id="directorySyncPanel">
+                    <div class="panel-heading"><i class="fa fa-refresh"></i> Directory Sync</div>
+                    <div class="panel-body">
+                        <p class="text-muted small">Pull this group's members from a directory. Syncing replaces the list below. You can still add or import members by hand.</p>
+                        <div class="form-group">
+                            <label for="directoryConnector">Connector</label>
+                            <select class="form-control" id="directoryConnector"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="directoryExternalId">Directory group</label>
+                            <input type="text" class="form-control" id="directoryExternalId"
+                                placeholder="Group ID, email, or distinguished name" />
+                            <span class="help-block small" id="directoryExternalHint"></span>
+                        </div>
+                        <button type="button" class="btn btn-default" id="saveSourceButton"><i class="fa fa-save"></i> Save Source</button>
+                        <button type="button" class="btn btn-primary" id="syncNowButton"><i class="fa fa-refresh"></i> Sync Now</button>
+                        <button type="button" class="btn btn-link text-danger hidden" id="removeSourceButton">Remove sync</button>
+                        <div class="small text-muted" id="directorySyncStatus" style="margin-top: 8px;"></div>
+                    </div>
+                </div>
                 <div class="row">
                     <form id="targetForm">
                         <div class="col-sm-2">
