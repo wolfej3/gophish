@@ -111,6 +111,48 @@ When you upgrade, everything that existed before teams moves into a team called 
 
 Teams are the first step toward hosting Gophish for multiple separate client organizations; those will later contain teams.
 
+### Directory Sync
+
+A group's members can be pulled from an identity directory instead of, or alongside, the CSV import. You configure one or more **directory connectors** in `config.json`, and each group can point at a connector and a directory group, then sync its members on demand from the group editor.
+
+Only the connector credentials live in `config.json`; the database stores just which connector and directory group each Gophish group uses, plus the last sync result. Syncing replaces the group's members with the directory's, keeping anyone you also added by hand in the same group only if they're in the directory. An empty directory result fails the sync rather than emptying the group, so a misconfiguration can't wipe a campaign's recipients. Editing a group's members by hand and importing a CSV both still work.
+
+Connectors go under `admin_server`:
+
+```json
+"directory": [
+	{
+		"name": "Entra",
+		"provider": "msgraph",
+		"tenant_id": "...",
+		"client_id": "...",
+		"client_secret": "..."
+	},
+	{
+		"name": "Workspace",
+		"provider": "google",
+		"credentials_file": "/etc/gophish/google-sa.json",
+		"delegated_subject": "admin@example.com"
+	},
+	{
+		"name": "AD",
+		"provider": "ldap",
+		"url": "ldaps://dc.example.com:636",
+		"bind_dn": "CN=gophish,OU=Service,DC=example,DC=com",
+		"bind_password": "...",
+		"base_dn": "DC=example,DC=com"
+	}
+]
+```
+
+**Providers and the directory group identifier (`external_id`) each expects:**
+
+- **`msgraph` (Microsoft Entra ID):** an app registration with the `GroupMember.Read.All` and `User.Read.All` application permissions (admin-consented). The directory group is its **object ID**.
+- **`google` (Google Workspace):** a service account with domain-wide delegation for the `admin.directory.group.member.readonly` and `admin.directory.user.readonly` scopes, and `delegated_subject` set to an admin to act as. The directory group is its **email address**.
+- **`ldap` (any LDAP directory, including Active Directory):** the defaults match Active Directory — members are found with `(&(objectClass=user)(memberOf=%s))` and read from `mail`, `givenName`, and `sn`. The directory group is its **distinguished name**. Override `user_filter`, `email_attribute`, `first_name_attribute`, and `last_name_attribute` for other LDAP schemas; `start_tls` and `insecure_tls` control the connection.
+
+Setting a source or syncing takes the editor role on the group's team. Directory sync runs when you click **Sync Now**; scheduled syncing will come with the scheduling feature.
+
 ### Admin Security
 
 #### Sessions
