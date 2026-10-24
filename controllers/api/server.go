@@ -86,6 +86,8 @@ func (as *Server) registerRoutes() {
 	router.HandleFunc("/groups/{id:[0-9]+}/source", as.GroupSource)
 	router.HandleFunc("/groups/{id:[0-9]+}/sync", as.GroupSync)
 	router.HandleFunc("/directory/connectors", as.DirectoryConnectors)
+	router.HandleFunc("/people/", as.People)
+	router.HandleFunc("/people/{email}", as.Person)
 	router.HandleFunc("/templates/", as.Templates)
 	router.HandleFunc("/templates/{id:[0-9]+}", as.Template)
 	router.HandleFunc("/pages/", as.Pages)

@@ -133,6 +133,14 @@ var api = {
         }
     },
     // groupId contains the endpoints for /groups/:id
+    people: {
+        get: function () {
+            return query("/people/", "GET", {}, false)
+        },
+        detail: function (email) {
+            return query("/people/" + encodeURIComponent(email), "GET", {}, false)
+        },
+    },
     directory: {
         connectors: function () {
             return query("/directory/connectors", "GET", {}, false)

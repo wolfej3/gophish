@@ -1,0 +1,60 @@
+{{define "body"}}
+<div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
+    <h1 class="page-header">People</h1>
+    <div id="flashes" class="row"></div>
+    <p>Everyone who has been in a campaign in this team, and how they've responded across all of them. Counts are the number of campaigns in which each thing happened.</p>
+    <div id="loading">
+        <i class="fa fa-spinner fa-spin fa-4x"></i>
+    </div>
+    <div id="emptyMessage" class="row" style="display:none;">
+        <div class="alert alert-info">No campaign activity yet.</div>
+    </div>
+    <div class="row">
+        <table id="peopleTable" class="table" style="display:none;">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Campaigns</th>
+                    <th>Opened</th>
+                    <th>Clicked</th>
+                    <th>Submitted</th>
+                    <th>Reported</th>
+                    <th>Last Activity</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Person detail modal -->
+<div class="modal fade" id="personModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title"><span id="personName"></span> <small id="personEmail"></small></h4>
+            </div>
+            <div class="modal-body">
+                <div id="personSummary" class="row"></div>
+                <h4>Campaign history</h4>
+                <table class="table table-condensed" id="personHistory">
+                    <thead><tr><th>Campaign</th><th>Furthest status</th><th>Reported</th><th>Sent</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+                <h4>Timeline</h4>
+                <table class="table table-condensed" id="personTimeline">
+                    <thead><tr><th>Time</th><th>Campaign</th><th>Event</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{{end}} {{define "scripts"}}
+<script src="/js/dist/app/people.min.js"></script>
+{{end}}

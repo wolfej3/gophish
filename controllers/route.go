@@ -164,6 +164,7 @@ func (as *AdminServer) registerRoutes() {
 	router.HandleFunc("/logout", mid.Use(as.Logout, mid.RequireLogin))
 	router.HandleFunc("/reset_password", mid.Use(as.ResetPassword, mid.RequireLogin))
 	router.HandleFunc("/campaigns", mid.Use(as.Campaigns, mid.RequireLogin))
+	router.HandleFunc("/people", mid.Use(as.People, mid.RequireLogin))
 	router.HandleFunc("/campaigns/{id:[0-9]+}", mid.Use(as.CampaignID, mid.RequireLogin))
 	router.HandleFunc("/templates", mid.Use(as.Templates, mid.RequireLogin))
 	router.HandleFunc("/groups", mid.Use(as.Groups, mid.RequireLogin))
@@ -246,6 +247,13 @@ func (as *AdminServer) Base(w http.ResponseWriter, r *http.Request) {
 	params := newTemplateParams(r)
 	params.Title = "Dashboard"
 	getTemplate(w, "dashboard").ExecuteTemplate(w, "base", params)
+}
+
+// People shows cross-campaign activity for each recipient
+func (as *AdminServer) People(w http.ResponseWriter, r *http.Request) {
+	params := newTemplateParams(r)
+	params.Title = "People"
+	getTemplate(w, "people").ExecuteTemplate(w, "base", params)
 }
 
 // Campaigns handles the default path and template execution
