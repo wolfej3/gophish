@@ -33,6 +33,7 @@ func (d *RestrictedDialer) AllowedHosts() []string {
 
 // SetAllowedHosts sets the list of allowed hosts or IP ranges for the dialer.
 func (d *RestrictedDialer) SetAllowedHosts(allowed []string) error {
+	nets := []*net.IPNet{}
 	for _, ipRange := range allowed {
 		// For flexibility, try to parse as an IP first since this will
 		// undoubtedly cause issues. If it works, then just append the
@@ -48,8 +49,11 @@ func (d *RestrictedDialer) SetAllowedHosts(allowed []string) error {
 		if err != nil {
 			return fmt.Errorf("provided ip range is not valid CIDR notation: %v", err)
 		}
-		d.allowedHosts = append(d.allowedHosts, parsed)
+		nets = append(nets, parsed)
 	}
+	// Replace rather than append, so configuring (or a test resetting) the
+	// allowlist is deterministic.
+	d.allowedHosts = nets
 	return nil
 }
 
@@ -62,12 +66,12 @@ func Dialer() *net.Dialer {
 // Dialer returns a net.Dialer that restricts outbound connections to only the
 // allowed addresses over TCP.
 //
-// By default, since Gophish anticipates connections originating to hosts on
-// the local network, we only deny access to the link-local addresses at
-// 169.254.0.0/16.
-//
-// If hosts are provided, then Gophish blocks access to all local addresses
-// except the ones provided.
+// All internal, loopback, link-local (including cloud metadata),
+// unspecified, multicast, CGNAT, and IPv4-mapped-IPv6 addresses are denied.
+// Specific internal hosts can be allowed back in through
+// allowed_internal_hosts (the allowed list), which is checked before the
+// deny list. The check runs at dial time against the resolved IP, so DNS
+// rebinding doesn't bypass it.
 //
 // This implementation is based on the blog post by Andrew Ayer at
 // https://www.agwa.name/blog/post/preventing_server_side_request_forgery_in_golang
@@ -77,12 +81,6 @@ func (d *RestrictedDialer) Dialer() *net.Dialer {
 		KeepAlive: 30 * time.Second,
 		Control:   restrictedControl(d.allowedHosts),
 	}
-}
-
-// defaultDeny represents the list of IP ranges that we want to block unless
-// explicitly overriden.
-var defaultDeny = []string{
-	"169.254.0.0/16", // Link-local (used for VPS instance metadata)
 }
 
 // allInternal represents all internal hosts such that the only connections
@@ -104,8 +102,6 @@ var allInternal = []string{
 	"::/0",               // Default route
 	"::/128",             // Unspecified address
 	"::1/128",            // IPv6 loopback
-	"::ffff:0:0/96",      // IPv4 mapped addresses.
-	"::ffff:0:0:0/96",    // IPv4 translated addresses.
 	"fe80::/10",          // IPv6 link-local
 	"fc00::/7",           // IPv6 unique local addr
 }
@@ -132,11 +128,16 @@ func restrictedControl(allowed []*net.IPNet) dialControl {
 		if ip == nil {
 			return fmt.Errorf("%s is not a valid IP address", host)
 		}
-
-		denyList := defaultDeny
-		if len(allowed) > 0 {
-			denyList = allInternal
+		// Normalize an IPv4-mapped IPv6 address (e.g. ::ffff:127.0.0.1) to
+		// its IPv4 form so a mapped address can't slip past the IPv4 rules.
+		if v4 := ip.To4(); v4 != nil {
+			ip = v4
 		}
+
+		// Internal ranges are blocked by default; an operator opts specific
+		// hosts back in through allowed_internal_hosts, which is checked
+		// first.
+		denyList := allInternal
 
 		for _, ipRange := range allowed {
 			if ipRange.Contains(ip) {

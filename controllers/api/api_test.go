@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/gophish/gophish/config"
+	"github.com/gophish/gophish/dialer"
 	"github.com/gophish/gophish/internal/testdb"
 	"github.com/gophish/gophish/models"
 )
@@ -95,6 +96,8 @@ func TestSiteImportBaseHref(t *testing.T) {
 	}))
 	expected := fmt.Sprintf("<html><head><base href=\"%s\"/></head><body><img src=\"/test.png\"/>\n</body></html>", ts.URL)
 	defer ts.Close()
+	dialer.SetAllowedHosts([]string{"127.0.0.1"})
+	defer dialer.SetAllowedHosts(nil)
 	req := httptest.NewRequest(http.MethodPost, "/api/import/site",
 		bytes.NewBuffer([]byte(fmt.Sprintf(`
 			{

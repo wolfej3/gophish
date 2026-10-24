@@ -74,8 +74,10 @@ func TestCrossTeamObjectAccessByID(t *testing.T) {
 				}
 				return s.Id
 			},
-			exists:  func(id int64) bool { _, err := models.GetSMTP(id, aliceTeam.Id); return err == nil },
-			putBody: func(id int64) interface{} { return models.SMTP{Id: id, Name: "Hacked", FromAddress: "a@b.com", Host: "smtp.example.com:25", Interface: models.SMTPInterface} },
+			exists: func(id int64) bool { _, err := models.GetSMTP(id, aliceTeam.Id); return err == nil },
+			putBody: func(id int64) interface{} {
+				return models.SMTP{Id: id, Name: "Hacked", FromAddress: "a@b.com", Host: "smtp.example.com:25", Interface: models.SMTPInterface}
+			},
 		},
 	}
 

@@ -2,13 +2,15 @@ package api
 
 import (
 	"bytes"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"html"
+	"io"
 	"net/http"
+	"net/url"
 	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/gophish/gophish/dialer"
@@ -26,6 +28,13 @@ type cloneRequest struct {
 func (cr *cloneRequest) validate() error {
 	if cr.URL == "" {
 		return errors.New("No URL Specified")
+	}
+	u, err := url.Parse(cr.URL)
+	if err != nil {
+		return errors.New("Invalid URL")
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return errors.New("URL must use http or https")
 	}
 	return nil
 }
@@ -99,6 +108,12 @@ func (as *Server) ImportEmail(w http.ResponseWriter, r *http.Request) {
 	JSONResponse(w, er, http.StatusOK)
 }
 
+// Limits on fetching a site to clone, to bound an SSRF or a huge response.
+const (
+	maxImportRedirects = 5
+	maxImportBodySize  = 10 << 20 // 10 MB
+)
+
 // ImportSite allows for the importing of HTML from a website
 // Without "include_resources" set, it will merely place a "base" tag
 // so that all resources can be loaded relative to the given URL.
@@ -119,19 +134,34 @@ func (as *Server) ImportSite(w http.ResponseWriter, r *http.Request) {
 	}
 	restrictedDialer := dialer.Dialer()
 	tr := &http.Transport{
-		DialContext: restrictedDialer.DialContext,
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
+		DialContext:           restrictedDialer.DialContext,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ResponseHeaderTimeout: 10 * time.Second,
+	}
+	client := &http.Client{
+		Transport: tr,
+		Timeout:   15 * time.Second,
+		// Cap redirects and re-check the scheme; the dialer re-validates
+		// the destination IP on each hop.
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= maxImportRedirects {
+				return fmt.Errorf("stopped after %d redirects", maxImportRedirects)
+			}
+			if req.URL.Scheme != "http" && req.URL.Scheme != "https" {
+				return fmt.Errorf("redirect to disallowed scheme %q", req.URL.Scheme)
+			}
+			return nil
 		},
 	}
-	client := &http.Client{Transport: tr}
 	resp, err := client.Get(cr.URL)
 	if err != nil {
 		JSONResponse(w, models.Response{Success: false, Message: err.Error()}, http.StatusBadRequest)
 		return
 	}
-	// Insert the base href tag to better handle relative resources
-	d, err := goquery.NewDocumentFromResponse(resp)
+	defer resp.Body.Close()
+	// Insert the base href tag to better handle relative resources. The body
+	// is capped so a huge or endless response can't exhaust memory.
+	d, err := goquery.NewDocumentFromReader(io.LimitReader(resp.Body, maxImportBodySize))
 	if err != nil {
 		JSONResponse(w, models.Response{Success: false, Message: err.Error()}, http.StatusBadRequest)
 		return

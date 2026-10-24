@@ -47,14 +47,15 @@ func TestDefaultDeniedImport(t *testing.T) {
 	}
 }
 
-func TestDefaultAllowedImport(t *testing.T) {
+func TestAllowlistedImport(t *testing.T) {
 	ctx := setupTest(t)
 	h := "<html><head></head><body><img src=\"/test.png\"/></body></html>"
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, h)
 	}))
 	defer ts.Close()
-	response := makeImportRequest(ctx, []string{}, ts.URL)
+	// Loopback is denied by default; allowlisting it lets the import through.
+	response := makeImportRequest(ctx, []string{"127.0.0.1"}, ts.URL)
 	expectedCode := http.StatusOK
 	if response.Code != expectedCode {
 		t.Fatalf("incorrect status code received. expected %d got %d", expectedCode, response.Code)

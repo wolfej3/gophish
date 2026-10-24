@@ -27,7 +27,8 @@ Back up your database first. Migrations run automatically when Gophish starts. T
 - The admin interface must be reached over HTTPS (see [Admin Server TLS](#admin-server-tls)). Over plain HTTP, every login is refused.
 - The `migrations_prefix` setting is no longer used, since migrations are embedded. It can be left in `config.json` or removed.
 - MySQL needs zero dates allowed (see [Database](#database)).
-- Deployments behind a reverse proxy must set `trusted_proxies` (see [Reverse proxies and client IPs](#reverse-proxies-and-client-ips)), or every client will appear to come from the proxy's IP. Previously Gophish trusted forwarded-for headers from anyone.
+- Server-side fetches (Import Site, webhooks) now block all internal, loopback, link-local, and cloud-metadata addresses by default. If you need to reach internal hosts, list them in `admin_server.allowed_internal_hosts`. Previously only link-local was blocked.
+- - Deployments behind a reverse proxy must set `trusted_proxies` (see [Reverse proxies and client IPs](#reverse-proxies-and-client-ips)), or every client will appear to come from the proxy's IP. Previously Gophish trusted forwarded-for headers from anyone.
 
 ### Install
 
