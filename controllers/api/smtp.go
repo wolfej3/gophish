@@ -70,6 +70,8 @@ func (as *Server) SendingProfile(w http.ResponseWriter, r *http.Request) {
 		}
 		JSONResponse(w, models.Response{Success: true, Message: "SMTP Deleted Successfully"}, http.StatusOK)
 	case r.Method == "PUT":
+		// Preserve the original creator; PUT shouldn't reassign ownership to the editor.
+		creator := s.UserId
 		s = models.SMTP{}
 		err = json.NewDecoder(r.Body).Decode(&s)
 		if err != nil {
@@ -85,7 +87,7 @@ func (as *Server) SendingProfile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.ModifiedDate = time.Now().UTC()
-		s.UserId = userID(r)
+		s.UserId = creator
 		s.TeamId = teamID(r)
 		err = models.PutSMTP(&s)
 		if err != nil {

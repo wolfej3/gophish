@@ -70,6 +70,8 @@ func (as *Server) Page(w http.ResponseWriter, r *http.Request) {
 		}
 		JSONResponse(w, models.Response{Success: true, Message: "Page Deleted Successfully"}, http.StatusOK)
 	case r.Method == "PUT":
+		// Preserve the original creator; PUT shouldn't reassign ownership to the editor.
+		creator := p.UserId
 		p = models.Page{}
 		err = json.NewDecoder(r.Body).Decode(&p)
 		if err != nil {
@@ -80,7 +82,7 @@ func (as *Server) Page(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		p.ModifiedDate = time.Now().UTC()
-		p.UserId = userID(r)
+		p.UserId = creator
 		p.TeamId = teamID(r)
 		err = models.PutPage(&p)
 		if err != nil {

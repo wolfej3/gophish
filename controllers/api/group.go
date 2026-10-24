@@ -85,6 +85,8 @@ func (as *Server) Group(w http.ResponseWriter, r *http.Request) {
 		JSONResponse(w, models.Response{Success: true, Message: "Group deleted successfully!"}, http.StatusOK)
 	case r.Method == "PUT":
 		// Change this to get from URL and uid (don't bother with id in r.Body)
+		// Preserve the original creator; PUT shouldn't reassign ownership to the editor.
+		creator := g.UserId
 		g = models.Group{}
 		err = json.NewDecoder(r.Body).Decode(&g)
 		if err != nil {
@@ -97,7 +99,7 @@ func (as *Server) Group(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		g.ModifiedDate = time.Now().UTC()
-		g.UserId = userID(r)
+		g.UserId = creator
 		g.TeamId = teamID(r)
 		err = models.PutGroup(&g)
 		if err != nil {

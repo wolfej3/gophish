@@ -80,6 +80,8 @@ func (as *Server) Template(w http.ResponseWriter, r *http.Request) {
 		}
 		JSONResponse(w, models.Response{Success: true, Message: "Template deleted successfully!"}, http.StatusOK)
 	case r.Method == "PUT":
+		// Preserve the original creator; PUT shouldn't reassign ownership to the editor.
+		creator := t.UserId
 		t = models.Template{}
 		err = json.NewDecoder(r.Body).Decode(&t)
 		if err != nil {
@@ -90,7 +92,7 @@ func (as *Server) Template(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		t.ModifiedDate = time.Now().UTC()
-		t.UserId = userID(r)
+		t.UserId = creator
 		t.TeamId = teamID(r)
 		err = models.PutTemplate(&t)
 		if err != nil {
