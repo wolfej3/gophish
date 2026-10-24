@@ -40,6 +40,11 @@ func (as *Server) IMAPServer(w http.ResponseWriter, r *http.Request) {
 			JSONResponse(w, models.Response{Success: false, Message: err.Error()}, http.StatusInternalServerError)
 			return
 		}
+		for i := range ss {
+			if ss[i].Password != "" {
+				ss[i].Password = secretPlaceholder
+			}
+		}
 		JSONResponse(w, ss, http.StatusOK)
 
 	// POST: Update database
@@ -49,6 +54,12 @@ func (as *Server) IMAPServer(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			JSONResponse(w, models.Response{Success: false, Message: "Invalid data. Please check your IMAP settings."}, http.StatusBadRequest)
 			return
+		}
+		// A placeholder password means "keep the stored value".
+		if im.Password == secretPlaceholder {
+			if existing, gerr := models.GetIMAP(ctx.Get(r, "user_id").(int64)); gerr == nil && len(existing) > 0 {
+				im.Password = existing[0].Password
+			}
 		}
 		im.ModifiedDate = time.Now().UTC()
 		im.UserId = ctx.Get(r, "user_id").(int64)

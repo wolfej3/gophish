@@ -137,7 +137,7 @@ A sending profile's **interface type** chooses how it sends, for environments wh
 - **Microsoft Graph** — sends through the Microsoft Graph API with an Entra ID app registration. The app needs the `Mail.Send` **application** permission (admin-consented). Fill in the directory (tenant) ID, application (client) ID, and client secret; the **Send as** address is the mailbox the mail is sent from (the app must be allowed to send as it).
 - **Gmail** — sends through the Gmail API with a Google Workspace service account that has domain-wide delegation for the `gmail.send` scope. Give the path to the service account credentials file; the **Send as** address is the Workspace user to send as.
 
-For both API transports the message is the same one the SMTP path builds, so templates, tracking, and the rest of a campaign work unchanged. Their credentials are stored on the sending profile, like the existing SMTP password.
+For both API transports the message is the same one the SMTP path builds, so templates, tracking, and the rest of a campaign work unchanged. Their credentials are stored on the sending profile, like the existing SMTP password. Secrets (SMTP/IMAP passwords, the Graph client secret) are never returned in API responses — they show as a placeholder you can leave unchanged to keep the stored value.
 
 ### People
 

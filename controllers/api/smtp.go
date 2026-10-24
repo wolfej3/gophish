@@ -20,6 +20,7 @@ func (as *Server) SendingProfiles(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Error(err)
 		}
+		redactSMTPs(ss)
 		JSONResponse(w, ss, http.StatusOK)
 	//POST: Create a new SMTP and return it as JSON
 	case r.Method == "POST":
@@ -45,6 +46,7 @@ func (as *Server) SendingProfiles(w http.ResponseWriter, r *http.Request) {
 			JSONResponse(w, models.Response{Success: false, Message: err.Error()}, http.StatusInternalServerError)
 			return
 		}
+		redactSMTP(&s)
 		JSONResponse(w, s, http.StatusCreated)
 	}
 }
@@ -61,6 +63,7 @@ func (as *Server) SendingProfile(w http.ResponseWriter, r *http.Request) {
 	}
 	switch {
 	case r.Method == "GET":
+		redactSMTP(&s)
 		JSONResponse(w, s, http.StatusOK)
 	case r.Method == "DELETE":
 		err = models.DeleteSMTP(id, teamID(r))
@@ -72,6 +75,8 @@ func (as *Server) SendingProfile(w http.ResponseWriter, r *http.Request) {
 	case r.Method == "PUT":
 		// Preserve the original creator; PUT shouldn't reassign ownership to the editor.
 		creator := s.UserId
+		existingPassword := s.Password
+		existingSecret := s.ClientSecret
 		s = models.SMTP{}
 		err = json.NewDecoder(r.Body).Decode(&s)
 		if err != nil {
@@ -80,6 +85,13 @@ func (as *Server) SendingProfile(w http.ResponseWriter, r *http.Request) {
 		if s.Id != id {
 			JSONResponse(w, models.Response{Success: false, Message: "/:id and /:smtp_id mismatch"}, http.StatusBadRequest)
 			return
+		}
+		// A placeholder secret means "keep the stored value".
+		if s.Password == secretPlaceholder {
+			s.Password = existingPassword
+		}
+		if s.ClientSecret == secretPlaceholder {
+			s.ClientSecret = existingSecret
 		}
 		err = s.Validate()
 		if err != nil {
@@ -94,6 +106,7 @@ func (as *Server) SendingProfile(w http.ResponseWriter, r *http.Request) {
 			JSONResponse(w, models.Response{Success: false, Message: "Error updating page"}, http.StatusInternalServerError)
 			return
 		}
+		redactSMTP(&s)
 		JSONResponse(w, s, http.StatusOK)
 	}
 }
