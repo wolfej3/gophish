@@ -27,6 +27,7 @@ Back up your database first. Migrations run automatically when Gophish starts. T
 - The admin interface must be reached over HTTPS (see [Admin Server TLS](#admin-server-tls)). Over plain HTTP, every login is refused.
 - The `migrations_prefix` setting is no longer used, since migrations are embedded. It can be left in `config.json` or removed.
 - MySQL needs zero dates allowed (see [Database](#database)).
+- Deployments behind a reverse proxy must set `trusted_proxies` (see [Reverse proxies and client IPs](#reverse-proxies-and-client-ips)), or every client will appear to come from the proxy's IP. Previously Gophish trusted forwarded-for headers from anyone.
 
 ### Install
 
@@ -98,6 +99,22 @@ If you access the admin interface through a different hostname than the one the 
 In Docker, the admin server uses built-in TLS unless `ADMIN_USE_TLS=false` is set.
 
 This applies only to the admin server. The phishing server's `use_tls` setting is unaffected.
+
+### Reverse proxies and client IPs
+
+Gophish uses the client's IP address to rate-limit logins and to record who did what in the audit log and in campaign results. Behind a reverse proxy the real client IP arrives in an `X-Forwarded-For` / `X-Real-IP` header, but any client can send those headers, so Gophish only trusts them from proxies you list.
+
+Set `trusted_proxies` on `admin_server` and/or `phish_server` to the proxies' addresses as CIDRs (bare IPs are allowed and treated as `/32` or `/128`):
+
+```json
+"admin_server": {
+	"trusted_proxies": ["10.0.0.0/8", "127.0.0.1"]
+}
+```
+
+With `trusted_proxies` empty (the default), forwarded-for headers are ignored and the direct peer is always used, so no one can spoof their IP. A bad CIDR makes Gophish exit at startup with a clear error. In Docker, set `ADMIN_TRUSTED_PROXIES` / `PHISH_TRUSTED_PROXIES` to a comma-separated list.
+
+Gophish reads the **first** entry of `X-Forwarded-For`. With nginx, set `proxy_set_header X-Forwarded-For $remote_addr;` (not `$proxy_add_x_forwarded_for`, which lets a client prepend a forged address).
 
 ### Teams
 

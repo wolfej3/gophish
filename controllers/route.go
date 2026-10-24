@@ -209,9 +209,13 @@ func (as *AdminServer) registerRoutes() {
 	gzipWrapper, _ := gziphandler.NewGzipLevelHandler(gzip.BestCompression)
 	adminHandler = gzipWrapper(adminHandler)
 
-	// Respect X-Forwarded-For and X-Real-IP headers in case we're behind a
-	// reverse proxy.
-	adminHandler = handlers.ProxyHeaders(adminHandler)
+	// Respect X-Forwarded-For and X-Real-IP headers only from trusted
+	// reverse proxies, so clients can't spoof their IP.
+	trustedProxies, err := config.ParseTrustedProxies(as.config.TrustedProxies)
+	if err != nil {
+		log.Fatalf("invalid admin_server.trusted_proxies: %v", err)
+	}
+	adminHandler = trustedProxyHeaders(trustedProxies, adminHandler)
 
 	// Setup logging
 	adminHandler = handlers.CombinedLoggingHandler(log.Writer(), adminHandler)

@@ -122,9 +122,14 @@ func (ps *PhishingServer) registerRoutes() {
 	gzipWrapper, _ := gziphandler.NewGzipLevelHandler(gzip.BestCompression)
 	phishHandler := gzipWrapper(router)
 
-	// Respect X-Forwarded-For and X-Real-IP headers in case we're behind a
-	// reverse proxy.
-	phishHandler = handlers.ProxyHeaders(phishHandler)
+	// Respect X-Forwarded-For and X-Real-IP headers only from trusted
+	// reverse proxies, so recipients can't spoof the IPs recorded in
+	// campaign results.
+	trustedProxies, err := config.ParseTrustedProxies(ps.config.TrustedProxies)
+	if err != nil {
+		log.Fatalf("invalid phish_server.trusted_proxies: %v", err)
+	}
+	phishHandler = trustedProxyHeaders(trustedProxies, phishHandler)
 
 	// Setup logging
 	phishHandler = handlers.CombinedLoggingHandler(log.Writer(), phishHandler)

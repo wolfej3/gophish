@@ -2,7 +2,10 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
+	"net"
+	"strings"
 
 	log "github.com/gophish/gophish/logger"
 )
@@ -16,8 +19,12 @@ type AdminServer struct {
 	CSRFKey              string   `json:"csrf_key"`
 	AllowedInternalHosts []string `json:"allowed_internal_hosts"`
 	TrustedOrigins       []string `json:"trusted_origins"`
-	OIDC                 *OIDC    `json:"oidc"`
-	SAML                 *SAML    `json:"saml"`
+	// TrustedProxies lists CIDRs (or bare IPs) of reverse proxies whose
+	// X-Forwarded-For / X-Real-IP headers may be trusted. Empty trusts no
+	// proxy headers, so the direct peer is always used.
+	TrustedProxies []string `json:"trusted_proxies"`
+	OIDC           *OIDC    `json:"oidc"`
+	SAML           *SAML    `json:"saml"`
 	// Directory lists connectors that groups can sync their members from.
 	Directory []DirectoryConnector `json:"directory"`
 }
@@ -149,6 +156,9 @@ type PhishServer struct {
 	UseTLS    bool   `json:"use_tls"`
 	CertPath  string `json:"cert_path"`
 	KeyPath   string `json:"key_path"`
+	// TrustedProxies lists CIDRs (or bare IPs) of reverse proxies whose
+	// forwarded-for headers may be trusted. Empty trusts no proxy headers.
+	TrustedProxies []string `json:"trusted_proxies"`
 }
 
 // Config represents the configuration information.
@@ -161,6 +171,34 @@ type Config struct {
 	TestFlag       bool        `json:"test_flag"`
 	ContactAddress string      `json:"contact_address"`
 	Logging        *log.Config `json:"logging"`
+}
+
+// ParseTrustedProxies parses a list of CIDR strings (or bare IPs, treated as
+// /32 or /128) into networks. It returns an error on any invalid entry, so
+// callers can fail at startup.
+func ParseTrustedProxies(entries []string) ([]*net.IPNet, error) {
+	nets := make([]*net.IPNet, 0, len(entries))
+	for _, entry := range entries {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		if !strings.Contains(entry, "/") {
+			if ip := net.ParseIP(entry); ip != nil {
+				if ip.To4() != nil {
+					entry += "/32"
+				} else {
+					entry += "/128"
+				}
+			}
+		}
+		_, network, err := net.ParseCIDR(entry)
+		if err != nil {
+			return nil, fmt.Errorf("invalid trusted_proxies entry %q: %w", entry, err)
+		}
+		nets = append(nets, network)
+	}
+	return nets, nil
 }
 
 // Version contains the current gophish version

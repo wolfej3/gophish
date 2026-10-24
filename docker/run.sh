@@ -31,6 +31,12 @@ if [ -n "${ADMIN_TRUSTED_ORIGINS+set}" ] ; then
         '.admin_server.trusted_origins = ($ADMIN_TRUSTED_ORIGINS|split(","))' config.json > config.json.tmp && \
         cat config.json.tmp > config.json
 fi
+if [ -n "${ADMIN_TRUSTED_PROXIES+set}" ] ; then
+    jq -r \
+        --arg ADMIN_TRUSTED_PROXIES "${ADMIN_TRUSTED_PROXIES}" \
+        '.admin_server.trusted_proxies = ($ADMIN_TRUSTED_PROXIES|split(","))' config.json > config.json.tmp && \
+        cat config.json.tmp > config.json
+fi
 
 # set config for phish_server
 if [ -n "${PHISH_LISTEN_URL+set}" ] ; then
@@ -55,6 +61,12 @@ if [ -n "${PHISH_KEY_PATH+set}" ] ; then
     jq -r \
         --arg PHISH_KEY_PATH "${PHISH_KEY_PATH}" \
         '.phish_server.key_path = $PHISH_KEY_PATH' config.json > config.json.tmp && \
+        cat config.json.tmp > config.json
+fi
+if [ -n "${PHISH_TRUSTED_PROXIES+set}" ] ; then
+    jq -r \
+        --arg PHISH_TRUSTED_PROXIES "${PHISH_TRUSTED_PROXIES}" \
+        '.phish_server.trusted_proxies = ($PHISH_TRUSTED_PROXIES|split(","))' config.json > config.json.tmp && \
         cat config.json.tmp > config.json
 fi
 
