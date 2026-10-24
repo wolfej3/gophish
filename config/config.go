@@ -112,6 +112,7 @@ type SAML struct {
 	// work as they do for OIDC.
 	AutoCreateUsers      bool     `json:"auto_create_users"`
 	DefaultRole          string   `json:"default_role"`
+	AllowAdminAutoCreate bool     `json:"allow_admin_auto_create"`
 	AllowedDomains       []string `json:"allowed_domains"`
 	DisablePasswordLogin bool     `json:"disable_password_login"`
 }
@@ -140,6 +141,9 @@ type OIDC struct {
 	// without one, with the role in DefaultRole.
 	AutoCreateUsers bool   `json:"auto_create_users"`
 	DefaultRole     string `json:"default_role"`
+	// AllowAdminAutoCreate must be set to allow auto-created users to get the
+	// admin role; otherwise a default_role of "admin" is refused.
+	AllowAdminAutoCreate bool `json:"allow_admin_auto_create"`
 	// AllowedDomains, if set, limits sign in to usernames ending in one of
 	// these email domains.
 	AllowedDomains []string `json:"allowed_domains"`

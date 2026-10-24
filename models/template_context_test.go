@@ -45,3 +45,16 @@ func (s *ModelsSuite) TestNewTemplateContext(c *check.C) {
 	c.Assert(err, check.Equals, nil)
 	c.Assert(got, check.DeepEquals, expected)
 }
+
+func (s *ModelsSuite) TestExecuteTemplateSizeCap(ch *check.C) {
+	orig := maxTemplateOutput
+	maxTemplateOutput = 1000
+	defer func() { maxTemplateOutput = orig }()
+
+	out, err := ExecuteTemplate("Hello {{.FirstName}}", struct{ FirstName string }{"A"})
+	ch.Assert(err, check.Equals, nil)
+	ch.Assert(out, check.Equals, "Hello A")
+
+	_, err = ExecuteTemplate("{{range $i := .N}}xxxxxxxxxx{{end}}", struct{ N int }{10000})
+	ch.Assert(err, check.Equals, ErrTemplateTooLarge)
+}

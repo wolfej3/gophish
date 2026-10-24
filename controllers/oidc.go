@@ -13,6 +13,7 @@ import (
 	"github.com/gophish/gophish/auth"
 	"github.com/gophish/gophish/config"
 	ctx "github.com/gophish/gophish/context"
+	log "github.com/gophish/gophish/logger"
 	"github.com/gophish/gophish/models"
 	"github.com/gorilla/sessions"
 	"golang.org/x/oauth2"
@@ -64,6 +65,14 @@ func newOIDCClient(conf config.OIDC) (*oidcClient, error) {
 	}
 	if conf.DefaultRole == "" {
 		conf.DefaultRole = models.RoleUser
+	}
+	if conf.AutoCreateUsers {
+		if conf.DefaultRole == models.RoleAdmin && !conf.AllowAdminAutoCreate {
+			return nil, errors.New("auto_create_users with default_role \"admin\" is refused; set allow_admin_auto_create to confirm")
+		}
+		if len(conf.AllowedDomains) == 0 {
+			log.Warn("single sign-on auto_create_users is on with no allowed_domains; anyone who can authenticate at the identity provider gets an account")
+		}
 	}
 	return &oidcClient{conf: conf}, nil
 }

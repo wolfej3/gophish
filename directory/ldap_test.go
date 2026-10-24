@@ -35,3 +35,23 @@ func TestAttrOr(t *testing.T) {
 		t.Fatal("expected the provided value")
 	}
 }
+
+func TestLDAPRefusesPlaintextWithoutTLS(t *testing.T) {
+	base := config.DirectoryConnector{Provider: "ldap", BaseDN: "dc=example,dc=com"}
+	// Plain ldap:// with no start_tls/insecure is refused.
+	c := base
+	c.URL = "ldap://dc.example.com"
+	if _, err := newProvider(c); err == nil {
+		t.Fatal("expected plaintext ldap:// to be refused")
+	}
+	// ldaps:// is fine.
+	c.URL = "ldaps://dc.example.com"
+	if _, err := newProvider(c); err != nil {
+		t.Fatalf("expected ldaps:// to be allowed, got %v", err)
+	}
+	// ldap:// with start_tls is fine.
+	c.URL, c.StartTLS = "ldap://dc.example.com", true
+	if _, err := newProvider(c); err != nil {
+		t.Fatalf("expected ldap:// + start_tls to be allowed, got %v", err)
+	}
+}

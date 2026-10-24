@@ -85,6 +85,14 @@ func newSAMLClient(conf config.SAML) (*samlClient, error) {
 	if conf.DefaultRole == "" {
 		conf.DefaultRole = models.RoleUser
 	}
+	if conf.AutoCreateUsers {
+		if conf.DefaultRole == models.RoleAdmin && !conf.AllowAdminAutoCreate {
+			return nil, errors.New("auto_create_users with default_role \"admin\" is refused; set allow_admin_auto_create to confirm")
+		}
+		if len(conf.AllowedDomains) == 0 {
+			log.Warn("single sign-on auto_create_users is on with no allowed_domains; anyone who can authenticate at the identity provider gets an account")
+		}
+	}
 	cert, key, err := loadSAMLKeyPair(conf.CertPath, conf.KeyPath, root.Hostname())
 	if err != nil {
 		return nil, fmt.Errorf("saml: %w", err)

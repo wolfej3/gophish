@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-ldap/ldap/v3"
 	"github.com/gophish/gophish/config"
+	log "github.com/gophish/gophish/logger"
 	"github.com/gophish/gophish/models"
 )
 
@@ -34,6 +35,18 @@ func newLDAPProvider(conn config.DirectoryConnector) (Provider, error) {
 	}
 	if conn.BaseDN == "" {
 		return nil, errors.New("ldap: base_dn is required")
+	}
+	isPlain := strings.HasPrefix(strings.ToLower(conn.URL), "ldap://")
+	if isPlain && !conn.StartTLS && !conn.InsecureTLS {
+		return nil, errors.New("ldap: refusing a plaintext ldap:// connection; use ldaps://, set start_tls, or set insecure_tls to allow it")
+	}
+	if conn.InsecureTLS {
+		log.Warnf("directory connector %q uses insecure_tls, which skips certificate verification and is vulnerable to man-in-the-middle attacks", conn.Name)
+	}
+	if isPlain && conn.StartTLS {
+		// StartTLS on a plain connection is fine; nothing to warn about.
+	} else if isPlain {
+		log.Warnf("directory connector %q uses a plaintext ldap:// connection", conn.Name)
 	}
 	return &ldapProvider{conn: conn}, nil
 }
