@@ -30,6 +30,9 @@ func setupTest(t *testing.T) *testContext {
 	if err != nil {
 		t.Fatalf("error getting user: %v", err)
 	}
+	// A set-up admin has already changed the initial password.
+	u.PasswordChangeRequired = false
+	models.PutUser(&u)
 	ctx := &testContext{}
 	ctx.apiKey = u.ApiKey
 	return ctx
@@ -215,6 +218,8 @@ func TestApplySecurityHeaders(t *testing.T) {
 	expected := map[string]string{
 		"Content-Security-Policy": "frame-ancestors 'none';",
 		"X-Frame-Options":         "DENY",
+		"X-Content-Type-Options":  "nosniff",
+		"Referrer-Policy":         "same-origin",
 	}
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	response := httptest.NewRecorder()

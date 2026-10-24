@@ -1,20 +1,20 @@
 function errorFlash(message) {
     $("#flashes").empty()
     $("#flashes").append("<div style=\"text-align:center\" class=\"alert alert-danger\">\
-        <i class=\"fa fa-exclamation-circle\"></i> " + message + "</div>")
+        <i class=\"fa fa-exclamation-circle\"></i> " + escapeHtml(message) + "</div>")
 }
 
 function successFlash(message) {
     $("#flashes").empty()
     $("#flashes").append("<div style=\"text-align:center\" class=\"alert alert-success\">\
-        <i class=\"fa fa-check-circle\"></i> " + message + "</div>")
+        <i class=\"fa fa-check-circle\"></i> " + escapeHtml(message) + "</div>")
 }
 
 // Fade message after n seconds
 function errorFlashFade(message, fade) {
     $("#flashes").empty()
     $("#flashes").append("<div style=\"text-align:center\" class=\"alert alert-danger\">\
-        <i class=\"fa fa-exclamation-circle\"></i> " + message + "</div>")
+        <i class=\"fa fa-exclamation-circle\"></i> " + escapeHtml(message) + "</div>")
     setTimeout(function(){ 
         $("#flashes").empty() 
     }, fade * 1000);
@@ -23,7 +23,7 @@ function errorFlashFade(message, fade) {
 function successFlashFade(message, fade) {  
     $("#flashes").empty()
     $("#flashes").append("<div style=\"text-align:center\" class=\"alert alert-success\">\
-        <i class=\"fa fa-check-circle\"></i> " + message + "</div>")
+        <i class=\"fa fa-check-circle\"></i> " + escapeHtml(message) + "</div>")
     setTimeout(function(){ 
         $("#flashes").empty() 
     }, fade * 1000);
@@ -32,7 +32,7 @@ function successFlashFade(message, fade) {
 
 function modalError(message) {
     $("#modal\\.flashes").empty().append("<div style=\"text-align:center\" class=\"alert alert-danger\">\
-        <i class=\"fa fa-exclamation-circle\"></i> " + message + "</div>")
+        <i class=\"fa fa-exclamation-circle\"></i> " + escapeHtml(message) + "</div>")
 }
 
 function query(endpoint, method, data, async) {

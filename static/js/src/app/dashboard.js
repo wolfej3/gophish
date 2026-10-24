@@ -147,7 +147,7 @@ function renderPieChart(chartopts) {
                 if (this.key == undefined) {
                     return false
                 }
-                return '<span style="color:' + this.color + '">\u25CF</span>' + this.point.name + ': <b>' + this.y + '%</b><br/>'
+                return '<span style="color:' + this.color + '">\u25CF</span>' + escapeHtml(this.point.name) + ': <b>' + this.y + '%</b><br/>'
             }
         },
         series: [{
@@ -249,7 +249,7 @@ function generateTimelineChart(campaigns) {
         tooltip: {
             formatter: function () {
                 return Highcharts.dateFormat('%A, %b %d %l:%M:%S %P', new Date(this.x)) +
-                    '<br>' + this.point.name + '<br>% Success: <b>' + this.y + '%</b>'
+                    '<br>' + escapeHtml(this.point.name) + '<br>% Success: <b>' + this.y + '%</b>'
             }
         },
         legend: {

@@ -281,6 +281,10 @@ func ApplySecurityHeaders(next http.Handler) http.HandlerFunc {
 		csp := "frame-ancestors 'none';"
 		w.Header().Set("Content-Security-Policy", csp)
 		w.Header().Set("X-Frame-Options", "DENY")
+		// Don't let the browser MIME-sniff, and don't leak admin URLs to
+		// other origins via the Referer header.
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Referrer-Policy", "same-origin")
 		next.ServeHTTP(w, r)
 	}
 }
