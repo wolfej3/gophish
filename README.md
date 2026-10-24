@@ -111,6 +111,12 @@ When you upgrade, everything that existed before teams moves into a team called 
 
 Teams are the first step toward hosting Gophish for multiple separate client organizations; those will later contain teams.
 
+### People
+
+The **People** page shows everyone who has been in a campaign in the current team and how they've responded across all of them, rather than one campaign at a time. For each recipient it shows how many campaigns they were in and in how many they opened the email, clicked, submitted data, or reported it. The counts are per campaign, so clicking twice in one campaign counts once. Opening a person shows their full history — the furthest status reached in each campaign — and a single timeline of their events across every campaign.
+
+The same data is available from `GET /api/people/` (the list) and `GET /api/people/{email}` (one person's history and timeline), scoped to the team the request acts in.
+
 ### Directory Sync
 
 A group's members can be pulled from an identity directory instead of, or alongside, the CSV import. You configure one or more **directory connectors** in `config.json`, and each group can point at a connector and a directory group, then sync its members on demand from the group editor.
