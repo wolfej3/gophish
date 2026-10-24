@@ -166,6 +166,11 @@ func (as *Server) ImportSite(w http.ResponseWriter, r *http.Request) {
 		JSONResponse(w, models.Response{Success: false, Message: err.Error()}, http.StatusBadRequest)
 		return
 	}
+	// Strip autofocus attributes. A page with many of them hangs the admin
+	// browser when the imported HTML is later opened in the editor
+	// (CVE-2022-45003). They serve no purpose in a cloned landing page.
+	d.Find("[autofocus]").RemoveAttr("autofocus")
+
 	// Assuming we don't want to include resources, we'll need a base href
 	if d.Find("head base").Length() == 0 {
 		d.Find("head").PrependHtml(fmt.Sprintf("<base href=\"%s\">", html.EscapeString(cr.URL)))

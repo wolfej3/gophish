@@ -1,7 +1,9 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -34,5 +36,26 @@ func TestImportSiteBlocksSSRF(t *testing.T) {
 		if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "http or https") {
 			t.Fatalf("expected %s to be rejected for scheme, got %d %s", u, w.Code, w.Body.String())
 		}
+	}
+}
+
+// TestImportSiteStripsAutofocus ensures imported HTML has autofocus removed,
+// which otherwise hangs the admin editor (CVE-2022-45003).
+func TestImportSiteStripsAutofocus(t *testing.T) {
+	testCtx := setupTest(t)
+	page := `<html><head></head><body><input autofocus><input autofocus><div autofocus>x</div></body></html>`
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, page)
+	}))
+	defer ts.Close()
+	dialer.SetAllowedHosts([]string{"127.0.0.1"})
+	defer dialer.SetAllowedHosts(nil)
+
+	w := apiRequest(t, testCtx, http.MethodPost, "/api/import/site", testCtx.apiKey, map[string]interface{}{"url": ts.URL})
+	if w.Code != http.StatusOK {
+		t.Fatalf("import failed: %d %s", w.Code, w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "autofocus") {
+		t.Fatalf("imported HTML still contains autofocus: %s", w.Body.String())
 	}
 }
