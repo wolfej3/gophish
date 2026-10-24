@@ -3,7 +3,7 @@
 Gophish
 =======
 
-![Build Status](https://github.com/gophish/gophish/workflows/CI/badge.svg) [![GoDoc](https://godoc.org/github.com/gophish/gophish?status.svg)](https://godoc.org/github.com/gophish/gophish)
+![Build Status](https://github.com/wolfej3/gophish/workflows/CI/badge.svg) [![GoDoc](https://godoc.org/github.com/gophish/gophish?status.svg)](https://godoc.org/github.com/gophish/gophish)
 
 Gophish: Open-Source Phishing Toolkit
 
