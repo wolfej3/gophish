@@ -21,17 +21,31 @@ var CSRFExemptPrefixes = []string{
 }
 
 // CSRFExceptions is a middleware that prevents CSRF checks on routes listed in
-// CSRFExemptPrefixes.
+// CSRFExemptPrefixes. /api is exempt only for requests authenticated with an
+// API token; browser requests that rely on the session cookie must still
+// carry a CSRF token, so an in-page XSS or a cross-site form can't drive the
+// API.
 func CSRFExceptions(handler http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		for _, prefix := range CSRFExemptPrefixes {
-			if strings.HasPrefix(r.URL.Path, prefix) {
-				r = csrf.UnsafeSkipCheck(r)
+			if !strings.HasPrefix(r.URL.Path, prefix) {
+				continue
+			}
+			if prefix == "/api" && !hasAPIToken(r) {
 				break
 			}
+			r = csrf.UnsafeSkipCheck(r)
+			break
 		}
 		handler.ServeHTTP(w, r)
 	}
+}
+
+// hasAPIToken reports whether the request presents an API token (an
+// Authorization header or an api_key query parameter) rather than relying on
+// the session cookie.
+func hasAPIToken(r *http.Request) bool {
+	return r.Header.Get("Authorization") != "" || r.URL.Query().Get("api_key") != ""
 }
 
 // Use allows us to stack middleware to process the request
@@ -100,6 +114,14 @@ func RequireAPIKey(handler http.Handler) http.Handler {
 			}
 		}
 		if ak == "" {
+			// Fall back to the browser's session cookie, which GetContext
+			// has already resolved to a user (completed login, unlocked).
+			if u, ok := ctx.Get(r, "user").(models.User); ok {
+				r = ctx.Set(r, "user_id", u.Id)
+				r = ctx.Set(r, AuthMethodContextKey, AuthMethodSession)
+				handler.ServeHTTP(w, r)
+				return
+			}
 			JSONError(w, http.StatusUnauthorized, "API Key not set")
 			return
 		}
@@ -131,6 +153,9 @@ func RequireAPIKey(handler http.Handler) http.Handler {
 		r = ctx.Set(r, "api_key", ak)
 		if scoped != nil {
 			r = ctx.Set(r, ScopedAPIKeyContextKey, *scoped)
+			r = ctx.Set(r, AuthMethodContextKey, AuthMethodScopedKey)
+		} else {
+			r = ctx.Set(r, AuthMethodContextKey, AuthMethodAPIKey)
 		}
 		handler.ServeHTTP(w, r)
 	})
@@ -139,6 +164,17 @@ func RequireAPIKey(handler http.Handler) http.Handler {
 // ScopedAPIKeyContextKey is the request context key holding the scoped API
 // key used to authenticate the request, if any.
 const ScopedAPIKeyContextKey = "scoped_api_key"
+
+// AuthMethodContextKey holds how an API request was authenticated, for the
+// audit log.
+const AuthMethodContextKey = "auth_method"
+
+// How an API request was authenticated.
+const (
+	AuthMethodSession   = "session"
+	AuthMethodAPIKey    = "api key"
+	AuthMethodScopedKey = "scoped api key"
+)
 
 // EnforceAPIKeyScope limits requests made with a scoped API key to the
 // resources and access level it was given. It must come after RequireAPIKey.

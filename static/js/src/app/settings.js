@@ -3,14 +3,36 @@ $(document).ready(function () {
     $("#apiResetForm").submit(function (e) {
         api.reset()
             .success(function (response) {
-                user.api_key = response.data
                 successFlash(response.message)
-                $("#api_key").val(user.api_key)
+                $("#api_key").val(response.data)
             })
             .error(function (data) {
                 errorFlash(data.message)
             })
         return false
+    })
+    // Revealing the full API key requires re-entering the password (and a
+    // 2FA code if enabled), since it's no longer rendered into the page.
+    $("#apiRevealButton").click(function (e) {
+        e.preventDefault()
+        $("#apiRevealPrompt").removeClass("hidden")
+        $("#api_reveal_password").focus()
+    })
+    $("#apiRevealConfirm").click(function (e) {
+        e.preventDefault()
+        $.post("/settings/api_key/reveal", {
+            current_password: $("#api_reveal_password").val(),
+            code: $("#api_reveal_code").val(),
+            csrf_token: csrf_token
+        })
+            .done(function (data) {
+                $("#api_key").val(data.api_key)
+                $("#apiRevealPrompt").addClass("hidden")
+                $("#api_reveal_password, #api_reveal_code").val("")
+            })
+            .fail(function (data) {
+                errorFlash(data.responseJSON.message)
+            })
     })
     $("#settingsForm").submit(function (e) {
         $.post("/settings", $(this).serialize())

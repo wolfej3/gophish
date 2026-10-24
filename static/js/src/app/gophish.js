@@ -44,7 +44,10 @@ function query(endpoint, method, data, async) {
         dataType: "json",
         contentType: "application/json",
         beforeSend: function (xhr) {
-            xhr.setRequestHeader('Authorization', 'Bearer ' + user.api_key);
+            // The admin UI authenticates with the session cookie; the CSRF
+            // token guards state-changing requests. The full API key is no
+            // longer rendered into the page.
+            xhr.setRequestHeader('X-CSRF-Token', csrf_token);
             var teamId = getCurrentTeamId();
             if (teamId) {
                 xhr.setRequestHeader('X-Gophish-Team-Id', teamId);

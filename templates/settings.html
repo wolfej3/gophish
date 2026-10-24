@@ -30,13 +30,26 @@
             <div class="row">
                 <label for="api_key" class="col-sm-2 control-label form-label">API Key:</label>
                 <div class="col-md-6">
-                    <input type="text" id="api_key" onclick="this.select();" value="{{.User.ApiKey}}"
+                    <input type="text" id="api_key" onclick="this.select();" value="••••••••••••••••••••••••••••••••"
                         class="form-control" readonly />
                 </div>
-                <form id="apiResetForm">
+                <button class="btn btn-default" id="apiRevealButton"><i class="fa fa-eye"></i> Reveal</button>
+                <form id="apiResetForm" style="display:inline">
                     <button class="btn btn-primary"><i class="fa fa-refresh" type="submit"></i> Reset</button>
                     <input type="hidden" name="csrf_token" value="{{.Token}}" />
                 </form>
+            </div>
+            <div class="row hidden" id="apiRevealPrompt" style="margin-top:8px;">
+                <label class="col-sm-2 control-label form-label">Password:</label>
+                <div class="col-md-4">
+                    <input type="password" id="api_reveal_password" class="form-control" autocomplete="current-password" placeholder="Current password" />
+                </div>
+                {{if .User.TOTPEnabled}}
+                <div class="col-md-3">
+                    <input type="text" id="api_reveal_code" class="form-control" autocomplete="one-time-code" placeholder="2FA code" />
+                </div>
+                {{end}}
+                <button class="btn btn-primary" id="apiRevealConfirm">Show key</button>
             </div>
             <br />
             <form id="settingsForm">

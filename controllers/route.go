@@ -175,6 +175,7 @@ func (as *AdminServer) registerRoutes() {
 	router.HandleFunc("/settings/2fa/enable", mid.Use(as.EnableTOTP, as.limiter.Limit, mid.RequireLogin))
 	router.HandleFunc("/settings/2fa/disable", mid.Use(as.DisableTOTP, as.limiter.Limit, mid.RequireLogin))
 	router.HandleFunc("/settings/2fa/recovery_codes", mid.Use(as.RegenerateRecoveryCodes, as.limiter.Limit, mid.RequireLogin))
+	router.HandleFunc("/settings/api_key/reveal", mid.Use(as.APIKeyReveal, as.limiter.Limit, mid.RequireLogin))
 	router.HandleFunc("/users", mid.Use(as.UserManagement, mid.RequirePermission(models.PermissionModifySystem), mid.RequireLogin))
 	router.HandleFunc("/teams", mid.Use(as.TeamManagement, mid.RequirePermission(models.PermissionModifySystem), mid.RequireLogin))
 	router.HandleFunc("/webhooks", mid.Use(as.Webhooks, mid.RequirePermission(models.PermissionModifySystem), mid.RequireLogin))

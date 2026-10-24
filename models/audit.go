@@ -14,6 +14,8 @@ const (
 	AuditRecoveryCodes    = "recovery_codes_regenerated"
 	AuditImpersonate      = "impersonate"
 	AuditSSOUnlinked      = "sso_unlinked"
+	AuditAPIKeyRevealed   = "api_key_revealed"
+	AuditAPIKeyReset      = "api_key_reset"
 	AuditAPIRequest       = "api_request"
 	AuditAPIRequestDenied = "api_request_denied"
 	AuditAPIRequestFailed = "api_request_failed"

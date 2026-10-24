@@ -100,8 +100,11 @@ func AuditAPIRequests(next http.Handler) http.Handler {
 			action = models.AuditAPIRequestFailed
 		}
 		details := http.StatusText(rec.status)
+		if method, ok := ctx.Get(r, AuthMethodContextKey).(string); ok {
+			details += "; via " + method
+		}
 		if k, ok := ctx.Get(r, ScopedAPIKeyContextKey).(models.APIKey); ok {
-			details += "; API key " + k.Prefix + " (" + k.Name + ")"
+			details += " " + k.Prefix + " (" + k.Name + ")"
 		}
 		AuditUser(r, action, r.Method+" "+r.URL.Path, details)
 	})

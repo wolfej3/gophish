@@ -10,6 +10,7 @@ const actionNames = {
     "2fa_disabled": "Two-factor turned off",
     recovery_codes_regenerated: "Recovery codes regenerated",
     sso_unlinked: "Single sign-on unlinked",
+    api_key_revealed: "API key revealed",
     impersonate: "Impersonation",
     api_request: "Change",
     api_request_failed: "Failed change",
