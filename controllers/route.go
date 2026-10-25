@@ -15,6 +15,7 @@ import (
 	"github.com/gophish/gophish/config"
 	ctx "github.com/gophish/gophish/context"
 	"github.com/gophish/gophish/controllers/api"
+	"github.com/gophish/gophish/library"
 	log "github.com/gophish/gophish/logger"
 	mid "github.com/gophish/gophish/middleware"
 	"github.com/gophish/gophish/middleware/ratelimit"
@@ -42,6 +43,7 @@ type AdminServer struct {
 	limiter *ratelimit.PostLimiter
 	oidc    *oidcClient
 	saml    *samlClient
+	library *library.Library
 }
 
 var defaultTLSConfig = &tls.Config{
@@ -94,6 +96,16 @@ func NewAdminServer(config config.AdminServer, options ...AdminServerOption) *Ad
 		server:  defaultServer,
 		limiter: defaultLimiter,
 		config:  config,
+		library: library.New(config.TemplateLibrary),
+	}
+	if as.library != nil {
+		// Clone/pull in the background so the first page load isn't blocked on
+		// the network; List falls back to an on-demand clone if this is slow.
+		go func() {
+			if err := as.library.Sync(); err != nil {
+				log.Errorf("template library: initial sync failed: %v", err)
+			}
+		}()
 	}
 	if config.OIDC != nil {
 		client, err := newOIDCClient(*config.OIDC)
@@ -168,6 +180,7 @@ func (as *AdminServer) registerRoutes() {
 	router.HandleFunc("/people", mid.Use(as.People, mid.RequireLogin))
 	router.HandleFunc("/campaigns/{id:[0-9]+}", mid.Use(as.CampaignID, mid.RequireLogin))
 	router.HandleFunc("/templates", mid.Use(as.Templates, mid.RequireLogin))
+	router.HandleFunc("/template_library", mid.Use(as.TemplateLibrary, mid.RequireLogin))
 	router.HandleFunc("/groups", mid.Use(as.Groups, mid.RequireLogin))
 	router.HandleFunc("/landing_pages", mid.Use(as.LandingPages, mid.RequireLogin))
 	router.HandleFunc("/sending_profiles", mid.Use(as.SendingProfiles, mid.RequireLogin))
@@ -187,6 +200,7 @@ func (as *AdminServer) registerRoutes() {
 		api.WithWorker(as.worker),
 		api.WithLimiter(as.limiter),
 		api.WithDirectoryConnectors(as.config.Directory),
+		api.WithTemplateLibrary(as.library),
 	)
 	router.PathPrefix("/api/").Handler(api)
 
@@ -288,6 +302,14 @@ func (as *AdminServer) Templates(w http.ResponseWriter, r *http.Request) {
 	params := newTemplateParams(r)
 	params.Title = "Email Templates"
 	getTemplate(w, "templates").ExecuteTemplate(w, "base", params)
+}
+
+// TemplateLibrary handles the default path and template for the git-backed
+// template library browser.
+func (as *AdminServer) TemplateLibrary(w http.ResponseWriter, r *http.Request) {
+	params := newTemplateParams(r)
+	params.Title = "Template Library"
+	getTemplate(w, "template_library").ExecuteTemplate(w, "base", params)
 }
 
 // Groups handles the default path and template execution

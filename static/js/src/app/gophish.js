@@ -379,6 +379,25 @@ var api = {
             return query("/schedules/" + id, "DELETE", {}, false)
         },
     },
+    // library contains the endpoints for the git-backed template library
+    library: {
+        // templates() - lists the catalog templates
+        templates: function () {
+            return query("/library/templates", "GET", {}, false)
+        },
+        // template(name) - fetches a single catalog template with its bodies
+        template: function (name) {
+            return query("/library/template?name=" + encodeURIComponent(name), "GET", {}, false)
+        },
+        // import(name) - copies a catalog template into the caller's team
+        import: function (name) {
+            return query("/library/import", "POST", { name: name }, false)
+        },
+        // refresh() - pulls the latest catalog from the remote repository
+        refresh: function () {
+            return query("/library/refresh", "POST", {}, false)
+        },
+    },
     // import handles all of the "import" functions in the api
     import_email: function (req) {
         return query("/import/email", "POST", req, false)

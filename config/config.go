@@ -27,6 +27,31 @@ type AdminServer struct {
 	SAML           *SAML    `json:"saml"`
 	// Directory lists connectors that groups can sync their members from.
 	Directory []DirectoryConnector `json:"directory"`
+	// TemplateLibrary configures the git-backed catalog operators import
+	// email templates from. Nil disables the feature.
+	TemplateLibrary *TemplateLibrary `json:"template_library"`
+}
+
+// TemplateLibrary configures a git repository that serves as a shared,
+// read-only catalog of email templates. Operators import templates from it
+// into their own team as independent copies. Any auth secret lives here in
+// config.json, following the directory connector precedent.
+type TemplateLibrary struct {
+	// URL is the HTTP(S) remote to clone and pull, e.g.
+	// https://github.com/acme/phishing-templates.git.
+	URL string `json:"url"`
+	// Branch to track. Defaults to "main".
+	Branch string `json:"branch"`
+	// Username and AuthToken authenticate to a private repository over HTTP.
+	// For a GitHub/GitLab personal access token, set AuthToken; Username may
+	// be any non-empty value (defaults to "git").
+	Username  string `json:"username"`
+	AuthToken string `json:"auth_token"`
+	// Path is an optional subdirectory within the repo to scan for templates.
+	Path string `json:"path"`
+	// CachePath is the local directory the repo is cloned into. Defaults to
+	// "./template_library".
+	CachePath string `json:"cache_path"`
 }
 
 // DirectoryConnector holds the credentials for syncing group members from an

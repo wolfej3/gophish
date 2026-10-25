@@ -72,6 +72,7 @@ var appScripts = []string{
 	"settings.js",
 	"teams.js",
 	"templates.js",
+	"template_library.js",
 	"gophish.js",
 	"users.js",
 	"webhooks.js",

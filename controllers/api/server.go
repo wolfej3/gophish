@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gophish/gophish/config"
+	"github.com/gophish/gophish/library"
 	mid "github.com/gophish/gophish/middleware"
 	"github.com/gophish/gophish/middleware/ratelimit"
 	"github.com/gophish/gophish/models"
@@ -23,6 +24,7 @@ type Server struct {
 	worker    worker.Worker
 	limiter   *ratelimit.PostLimiter
 	directory []config.DirectoryConnector
+	library   *library.Library
 }
 
 // NewServer returns a new instance of the API handler with the provided
@@ -52,6 +54,13 @@ func WithWorker(w worker.Worker) ServerOption {
 func WithDirectoryConnectors(connectors []config.DirectoryConnector) ServerOption {
 	return func(as *Server) {
 		as.directory = connectors
+	}
+}
+
+// WithTemplateLibrary sets the git-backed template library (may be nil).
+func WithTemplateLibrary(lib *library.Library) ServerOption {
+	return func(as *Server) {
+		as.library = lib
 	}
 }
 
@@ -92,6 +101,10 @@ func (as *Server) registerRoutes() {
 	router.HandleFunc("/people/{email}", as.Person)
 	router.HandleFunc("/templates/", as.Templates)
 	router.HandleFunc("/templates/{id:[0-9]+}", as.Template)
+	router.HandleFunc("/library/templates", as.LibraryTemplates)
+	router.HandleFunc("/library/template", as.LibraryTemplate)
+	router.HandleFunc("/library/import", as.LibraryImport)
+	router.HandleFunc("/library/refresh", as.LibraryRefresh)
 	router.HandleFunc("/pages/", as.Pages)
 	router.HandleFunc("/pages/{id:[0-9]+}", as.Page)
 	router.HandleFunc("/smtp/", as.SendingProfiles)

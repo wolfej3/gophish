@@ -1,0 +1,81 @@
+{{define "body"}}
+<div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
+    <h1 class="page-header">
+        {{.Title}}
+    </h1>
+    <div id="flashes" class="row"></div>
+    <div class="row">
+        <button type="button" class="btn btn-default" id="refresh_button">
+            <i class="fa fa-refresh"></i> Refresh from Git</button>
+        <p class="text-muted small" style="margin-top:8px;">Browse the shared, git-backed catalog. Importing copies a template into your own workspace, where you can edit it freely.</p>
+    </div>
+    &nbsp;
+    <div id="loading">
+        <i class="fa fa-spinner fa-spin fa-4x"></i>
+    </div>
+    <div id="emptyState" class="row" style="display:none;">
+        <div class="alert alert-info" id="emptyMessage"></div>
+    </div>
+    <div class="row">
+        <table id="libraryTable" class="table" style="display:none;">
+            <thead>
+                <tr>
+                    <th class="col-md-3">Name</th>
+                    <th class="col-md-2">Category</th>
+                    <th class="col-md-3">Subject</th>
+                    <th class="col-md-2 no-sort">Content</th>
+                    <th class="col-md-2 no-sort"></th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1" role="dialog" aria-labelledby="previewModalLabel">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+                <h4 class="modal-title" id="previewModalLabel">Preview</h4>
+            </div>
+            <div class="modal-body">
+                <dl class="dl-horizontal">
+                    <dt>Subject</dt>
+                    <dd id="previewSubject"></dd>
+                    <dt>Envelope Sender</dt>
+                    <dd id="previewSender"></dd>
+                    <dt>Attachments</dt>
+                    <dd id="previewAttachments"></dd>
+                </dl>
+                <ul class="nav nav-tabs" id="previewTabs">
+                    <li class="active"><a href="#previewHtmlTab" data-toggle="tab">HTML</a></li>
+                    <li><a href="#previewTextTab" data-toggle="tab">Text</a></li>
+                </ul>
+                <div class="tab-content" style="padding-top:10px;">
+                    <div class="tab-pane active" id="previewHtmlTab">
+                        <!-- allow-same-origin lets the markup render; without allow-scripts, no
+                             script in the previewed template can execute in the admin origin. -->
+                        <iframe id="previewHtmlFrame" sandbox="allow-same-origin" style="width:100%;height:400px;border:1px solid #ddd;"></iframe>
+                    </div>
+                    <div class="tab-pane" id="previewTextTab">
+                        <pre id="previewText" style="max-height:400px;overflow:auto;"></pre>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="previewImportButton">
+                    <i class="fa fa-download"></i> Import</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{end}} {{define "scripts"}}
+<script src="/js/dist/app/template_library.min.js"></script>
+{{end}}
