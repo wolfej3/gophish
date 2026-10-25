@@ -3,13 +3,13 @@
     <div class="row">
         <div class="col-sm-3 col-md-2 sidebar">
             {{if .ManageTenants}}
-            <div id="tenantSwitcherGroup" class="form-group hidden" style="padding: 10px 15px 0;">
-                <label for="tenantSwitcher" class="control-label" style="font-size: 11px; text-transform: uppercase; color: #777;">Tenant</label>
+            <div id="tenantSwitcherGroup" class="form-group sidebar-switcher hidden">
+                <label for="tenantSwitcher" class="control-label">Tenant</label>
                 <select id="tenantSwitcher" class="form-control input-sm"></select>
             </div>
             {{end}}
-            <div id="teamSwitcherGroup" class="form-group hidden" style="padding: 10px 15px 0;">
-                <label for="teamSwitcher" class="control-label" style="font-size: 11px; text-transform: uppercase; color: #777;">Team</label>
+            <div id="teamSwitcherGroup" class="form-group sidebar-switcher hidden">
+                <label for="teamSwitcher" class="control-label">Team</label>
                 <select id="teamSwitcher" class="form-control input-sm"></select>
             </div>
             <ul class="nav nav-sidebar">

@@ -13,24 +13,26 @@ const loadTeams = () => {
             teams = ts
             $("#loading").hide()
             $("#teamTable").show()
-            const body = $("#teamTable tbody").empty()
+            // The Tenant column (index 1) is only useful to a provider admin.
+            const columnDefs = [{ orderable: false, targets: "no-sort" }]
+            if (!isProvider) {
+                columnDefs.push({ visible: false, targets: 1 })
+            }
+            const teamTable = $("#teamTable").DataTable({ destroy: true, columnDefs: columnDefs })
+            teamTable.clear()
             $.each(teams, (i, team) => {
-                const row = $("<tr>")
-                row.append($("<td>").text(team.name))
-                if (isProvider) {
-                    const tenant = tenantsById[team.tenant_id]
-                    row.append($("<td class='tenant-col'>").text(tenant ? tenant.name : "—"))
-                }
-                row.append($("<td>").append($("<button class='btn btn-default btn-sm members-button'>")
-                    .attr("data-team-id", team.id)
-                    .html("<i class='fa fa-users'></i> Members")))
-                const actions = $("<div class='pull-right'>")
-                actions.append($("<button class='btn btn-primary edit-button'>").attr("data-team-id", team.id).html("<i class='fa fa-pencil'></i>"))
-                actions.append(" ")
-                actions.append($("<button class='btn btn-danger delete-button'>").attr("data-team-id", team.id).html("<i class='fa fa-trash-o'></i>"))
-                row.append($("<td>").append(actions))
-                body.append(row)
+                const tenant = tenantsById[team.tenant_id]
+                teamTable.row.add([
+                    escapeHtml(team.name),
+                    tenant ? escapeHtml(tenant.name) : "",
+                    "<button class='btn btn-default btn-sm members-button' data-team-id='" + team.id + "'><i class='fa fa-users'></i> Members</button>",
+                    "<div class='pull-right' style='white-space:nowrap'>" +
+                    "<button class='btn btn-primary edit-button' data-team-id='" + team.id + "'><i class='fa fa-pencil'></i></button> " +
+                    "<button class='btn btn-danger delete-button' data-team-id='" + team.id + "'><i class='fa fa-trash-o'></i></button>" +
+                    "</div>"
+                ])
             })
+            teamTable.draw()
         })
         .error(() => errorFlash("Error fetching teams"))
 }
@@ -148,7 +150,6 @@ $(document).ready(function () {
         .error(() => {})
     // Provider admins see a Tenant column and pick a tenant when creating a team.
     if (isProvider) {
-        $(".tenant-col").show()
         api.tenants.get()
             .success((ts) => {
                 const select = $("#tenantSelect").empty()

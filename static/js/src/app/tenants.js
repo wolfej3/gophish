@@ -9,18 +9,22 @@ const loadTenants = () => {
             tenants = ts
             $("#loading").hide()
             $("#tenantTable").show()
-            const body = $("#tenantTable tbody").empty()
-            $.each(tenants, (i, tenant) => {
-                const row = $("<tr>")
-                row.append($("<td>").text(tenant.name))
-                row.append($("<td>").text(moment(tenant.created_at).format("MMMM Do YYYY, h:mm:ss a")))
-                const actions = $("<div class='pull-right'>")
-                actions.append($("<button class='btn btn-primary edit-button'>").attr("data-tenant-id", tenant.id).html("<i class='fa fa-pencil'></i>"))
-                actions.append(" ")
-                actions.append($("<button class='btn btn-danger delete-button'>").attr("data-tenant-id", tenant.id).html("<i class='fa fa-trash-o'></i>"))
-                row.append($("<td>").append(actions))
-                body.append(row)
+            const tenantTable = $("#tenantTable").DataTable({
+                destroy: true,
+                columnDefs: [{ orderable: false, targets: "no-sort" }]
             })
+            tenantTable.clear()
+            $.each(tenants, (i, tenant) => {
+                tenantTable.row.add([
+                    escapeHtml(tenant.name),
+                    moment(tenant.created_at).format("MMMM Do YYYY, h:mm:ss a"),
+                    "<div class='pull-right' style='white-space:nowrap'>" +
+                    "<button class='btn btn-primary edit-button' data-tenant-id='" + tenant.id + "'><i class='fa fa-pencil'></i></button> " +
+                    "<button class='btn btn-danger delete-button' data-tenant-id='" + tenant.id + "'><i class='fa fa-trash-o'></i></button>" +
+                    "</div>"
+                ])
+            })
+            tenantTable.draw()
         })
         .error(() => errorFlash("Error fetching tenants"))
 }
