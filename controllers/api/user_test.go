@@ -161,6 +161,72 @@ func TestModifyUser(t *testing.T) {
 	}
 }
 
+// TestTenantAdminCannotTouchProviderAdmin verifies that a tenant admin (which
+// has modify_system but not manage_tenants) can't modify or delete the
+// provider admin's account. The provider admin spans every tenant, so this
+// would otherwise be a privilege escalation. A control case confirms the
+// tenant admin can still act on an ordinary user in their own tenant.
+func TestTenantAdminCannotTouchProviderAdmin(t *testing.T) {
+	testCtx := setupTest(t)
+	// testCtx.admin (user 1) is the provider admin.
+	adminRole, err := models.GetRoleBySlug(models.RoleAdmin)
+	if err != nil {
+		t.Fatalf("error getting admin role: %v", err)
+	}
+	tadmin := &models.User{
+		Username: "tenant-admin",
+		Hash:     "x",
+		ApiKey:   "tenant-admin-key",
+		Role:     adminRole,
+		RoleID:   adminRole.ID,
+		TenantId: testCtx.admin.TenantId,
+	}
+	if err := models.PutUser(tadmin); err != nil {
+		t.Fatalf("error creating tenant admin: %v", err)
+	}
+	// An ordinary peer in the tenant admin's own tenant (the control).
+	peer := createUnpriviledgedUser(t, models.RoleUser)
+
+	do := func(method, path string, body []byte) int {
+		var r *http.Request
+		if body != nil {
+			r = httptest.NewRequest(method, path, bytes.NewBuffer(body))
+			r.Header.Set("Content-Type", "application/json")
+		} else {
+			r = httptest.NewRequest(method, path, nil)
+		}
+		r.Header.Set("Authorization", "Bearer "+tadmin.ApiKey)
+		w := httptest.NewRecorder()
+		testCtx.apiServer.ServeHTTP(w, r)
+		return w.Code
+	}
+
+	providerPath := fmt.Sprintf("/api/users/%d", testCtx.admin.Id)
+	pwBody, _ := json.Marshal(userRequest{Username: testCtx.admin.Username, Password: "a-new-password", Role: models.RoleProviderAdmin})
+
+	if code := do(http.MethodDelete, providerPath, nil); code != http.StatusForbidden {
+		t.Fatalf("deleting the provider admin: expected 403, got %d", code)
+	}
+	if code := do(http.MethodPut, providerPath, pwBody); code != http.StatusForbidden {
+		t.Fatalf("modifying the provider admin: expected 403, got %d", code)
+	}
+
+	// Control: the tenant admin can modify an ordinary peer in their tenant.
+	peerBody, _ := json.Marshal(userRequest{Username: peer.Username, Role: models.RoleUser})
+	if code := do(http.MethodPut, fmt.Sprintf("/api/users/%d", peer.Id), peerBody); code != http.StatusOK {
+		t.Fatalf("modifying an ordinary peer: expected 200, got %d", code)
+	}
+
+	// The provider admin's role is unchanged.
+	got, err := models.GetUser(testCtx.admin.Id)
+	if err != nil {
+		t.Fatalf("error reloading provider admin: %v", err)
+	}
+	if got.Role.Slug != models.RoleProviderAdmin {
+		t.Fatalf("provider admin role changed to %q", got.Role.Slug)
+	}
+}
+
 // TestUnauthorizedListUsers ensures that users without the ModifySystem
 // permission are unable to list the users registered in Gophish.
 func TestUnauthorizedListUsers(t *testing.T) {

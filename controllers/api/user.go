@@ -199,6 +199,15 @@ func (as *Server) User(w http.ResponseWriter, r *http.Request) {
 		JSONResponse(w, models.Response{Success: false, Message: "User not found"}, http.StatusNotFound)
 		return
 	}
+	// A provider admin outranks a tenant admin. Only a provider admin may
+	// modify or delete a provider admin's account; otherwise a tenant admin
+	// sharing the bootstrap provider admin's tenant could delete or alter it.
+	// (A tenant admin's own role is never provider_admin, so this never blocks
+	// a user from managing their own account.)
+	if r.Method != http.MethodGet && existingUser.Role.Slug == models.RoleProviderAdmin && !isProviderAdmin(r) {
+		JSONResponse(w, models.Response{Success: false, Message: ErrInsufficientPermission.Error()}, http.StatusForbidden)
+		return
+	}
 	if r.Method != http.MethodGet && denyScopedKeyUserWrite(w, r) {
 		return
 	}
