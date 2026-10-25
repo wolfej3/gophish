@@ -52,8 +52,13 @@ func RequireTeam(next http.Handler) http.Handler {
 			JSONError(w, http.StatusInternalServerError, "Error loading teams")
 			return
 		}
-		// Pick the requested team, then the user's default team, then their
-		// first one.
+		// Pick the requested team if the user can use it, then the user's
+		// default team, then their first one. A requested team the user can't
+		// use is ignored rather than rejected: the team id is sent
+		// automatically from the browser and can go stale (e.g. a different user
+		// signed in on the same browser), so it falls back to the user's own
+		// team instead of 403-ing every request. Falling back only ever selects
+		// a team the user already has, so it grants no extra access.
 		var current *models.TeamMembership
 		requested := requestedTeamID(r)
 		for i := range teams {
@@ -62,7 +67,7 @@ func RequireTeam(next http.Handler) http.Handler {
 				break
 			}
 		}
-		if current == nil && requested == 0 {
+		if current == nil {
 			if u.DefaultTeamId != 0 {
 				for i := range teams {
 					if teams[i].Id == u.DefaultTeamId {
@@ -79,12 +84,7 @@ func RequireTeam(next http.Handler) http.Handler {
 		resource := apiResource(r)
 		isTeamResource := models.TeamObjectResources[resource]
 		if current == nil {
-			// A request that names a team the user can't use, or a team
-			// request from a user with no team, can't proceed
-			if requested != 0 {
-				JSONError(w, http.StatusForbidden, "You don't have access to that team")
-				return
-			}
+			// Only a user who belongs to no team at all reaches here.
 			if isTeamResource {
 				JSONError(w, http.StatusForbidden, "You aren't a member of any team")
 				return

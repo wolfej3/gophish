@@ -439,6 +439,24 @@ var api = {
 }
 window.api = api
 
+// reconcileUserScope clears the remembered team/tenant selection when a
+// different user signs in on this browser, so one user's choice can't leak into
+// another user's session (and send a team id they can't use).
+function reconcileUserScope() {
+    try {
+        if (!window.user || !window.user.id) {
+            return
+        }
+        var stored = localStorage.getItem("gophish.userId")
+        if (stored !== String(window.user.id)) {
+            localStorage.removeItem("gophish.teamId")
+            localStorage.removeItem("gophish.tenantId")
+            localStorage.setItem("gophish.userId", String(window.user.id))
+        }
+    } catch (e) {}
+}
+window.reconcileUserScope = reconcileUserScope
+
 // getCurrentTeamId returns the team the UI is acting in, remembered per
 // browser. Empty means "let the server pick my first team".
 function getCurrentTeamId() {
@@ -559,6 +577,7 @@ $(document).ready(function () {
             $this.addClass('active');
         }
     })
+    reconcileUserScope();
     setupTeamSwitcher();
     setupTenantSwitcher();
     $.fn.dataTable.moment('MMMM Do YYYY, h:mm:ss a');
