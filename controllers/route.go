@@ -525,6 +525,20 @@ func (as *AdminServer) Impersonate(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
+		// Authorize the impersonation. modify_system (held by every tenant
+		// admin) is enough to reach this handler, so without a tenant/role
+		// check a tenant admin could impersonate the provider admin — who
+		// spans every tenant — and take over the whole system. A provider
+		// admin may impersonate anyone; anyone else may impersonate only
+		// users within their own tenant, and never a provider admin.
+		actor := ctx.Get(r, "user").(models.User)
+		if isProvider, _ := actor.HasPermission(models.PermissionManageTenants); !isProvider {
+			if u.Role.Slug == models.RoleProviderAdmin || u.TenantId != actor.TenantId {
+				log.Warnf("user %q tried to impersonate %q outside their authority", actor.Username, u.Username)
+				http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+				return
+			}
+		}
 		session := ctx.Get(r, "session").(*sessions.Session)
 		// Issue a new session token for the impersonated account
 		err = mid.RegenerateSession(session)

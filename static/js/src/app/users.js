@@ -238,16 +238,24 @@ const load = () => {
                     lastlogin = moment(user.last_login).format('MMMM Do YYYY, h:mm:ss a')
                 }
                 let tenant = tenantsById[user.tenant_id]
+                // A tenant admin must not impersonate the provider admin (that
+                // would be a privilege escalation); the server enforces this,
+                // and we hide the button to match. Provider admins can
+                // impersonate anyone.
+                let canImpersonate = isProvider || user.role.slug !== "provider_admin"
+                let impersonateButton = canImpersonate
+                    ? "<button class='btn btn-warning impersonate_button' data-user-id='" + user.id + "'>\
+                    <i class='fa fa-retweet'></i>\
+                    </button>"
+                    : ""
                 userRows.push([
                     escapeHtml(user.username),
                     tenant ? escapeHtml(tenant.name) : "",
                     escapeHtml(user.role.name),
                     lastlogin,
                     signInMethods(user),
-                    "<div class='pull-right' style='white-space:nowrap'>\
-                    <button class='btn btn-warning impersonate_button' data-user-id='" + user.id + "'>\
-                    <i class='fa fa-retweet'></i>\
-                    </button>\
+                    "<div class='pull-right' style='white-space:nowrap'>" +
+                    impersonateButton + "\
                     <button class='btn btn-primary edit_button' data-toggle='modal' data-backdrop='static' data-target='#modal' data-user-id='" + user.id + "'>\
                     <i class='fa fa-pencil'></i>\
                     </button>\

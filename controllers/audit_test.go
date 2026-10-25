@@ -106,6 +106,77 @@ func TestAuditImpersonation(t *testing.T) {
 	}
 }
 
+// createImpersonationUser makes a user who can sign in with a password, in a
+// given role and tenant, with their own personal team.
+func createImpersonationUser(t *testing.T, username, password, roleSlug string, tenantID int64) models.User {
+	t.Helper()
+	role, err := models.GetRoleBySlug(roleSlug)
+	if err != nil {
+		t.Fatalf("error getting role %q: %v", roleSlug, err)
+	}
+	hash, err := auth.GeneratePasswordHash(password)
+	if err != nil {
+		t.Fatalf("error hashing password: %v", err)
+	}
+	u := models.User{
+		Username: username,
+		Hash:     hash,
+		ApiKey:   auth.GenerateSecureKey(auth.APIKeyLength),
+		Role:     role,
+		RoleID:   role.ID,
+		TenantId: tenantID,
+	}
+	if err := models.PutUser(&u); err != nil {
+		t.Fatalf("error creating user %q: %v", username, err)
+	}
+	if _, err := models.EnsurePersonalTeam(u); err != nil {
+		t.Fatalf("error creating personal team for %q: %v", username, err)
+	}
+	return u
+}
+
+// TestImpersonateAuthorization guards against privilege escalation through
+// /impersonate: a tenant admin (who has modify_system) must not be able to
+// impersonate the provider admin or a user in another tenant.
+func TestImpersonateAuthorization(t *testing.T) {
+	ctx := setupTwoFactorTest(t)
+	defer tearDown(t, ctx)
+	// User 1 ("admin") is the provider admin, in the Default tenant.
+	admin, err := models.GetUser(1)
+	if err != nil {
+		t.Fatalf("error getting admin user: %v", err)
+	}
+	// A second tenant with a user of its own.
+	other := models.Tenant{Name: "Client A"}
+	if err := models.PostTenant(&other); err != nil {
+		t.Fatalf("error creating tenant: %v", err)
+	}
+	const pw = "impersonate-test-pw"
+	createImpersonationUser(t, "tadmin", pw, models.RoleAdmin, admin.TenantId)
+	createImpersonationUser(t, "peer", "x", models.RoleUser, admin.TenantId)
+	createImpersonationUser(t, "outsider", "x", models.RoleUser, other.Id)
+
+	client := newJarClient(t, ctx)
+	if resp := postForm(t, ctx, client, "/login", url.Values{"username": {"tadmin"}, "password": {pw}}); resp.StatusCode != http.StatusFound {
+		t.Fatalf("tenant admin login: expected 302, got %d", resp.StatusCode)
+	}
+
+	cases := []struct {
+		name, target string
+		want         int
+	}{
+		{"provider admin is off limits", "admin", http.StatusForbidden},
+		{"other tenant is off limits", "outsider", http.StatusForbidden},
+		{"own-tenant peer is allowed", "peer", http.StatusFound},
+	}
+	for _, c := range cases {
+		resp := postFormTo(t, ctx, client, "/settings", "/impersonate", url.Values{"username": {c.target}})
+		if resp.StatusCode != c.want {
+			t.Fatalf("%s: impersonating %q expected %d, got %d", c.name, c.target, c.want, resp.StatusCode)
+		}
+	}
+}
+
 func TestAuditLogPage(t *testing.T) {
 	ctx := setupTwoFactorTest(t)
 	defer tearDown(t, ctx)
