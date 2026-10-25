@@ -119,6 +119,75 @@ After a target interacts with a lure, deliver a short training page/module and
 record completion, so a campaign can both test and educate. Deferred from
 phase 4.
 
+## Security / maintenance
+
+### Replace CKEditor 4 with a CodeMirror source editor + sandboxed preview
+The template and landing-page HTML editors use a vendored **CKEditor 4.11.1**
+(`static/js/src/vendor/ckeditor/`), which is end-of-life. The config sets
+`fullPage = true` and `allowedContent = true` (`config.js`), and the editor
+renders HTML imported from arbitrary external sites (`controllers/api/import.go`
+ImportSite, plus email import) as editable content on the admin origin. Even the
+last free release, **4.22.1**, is still exposed to CVE-2024-24815 (fullPage CDATA
+XSS); that is fixed only in the commercial 4.24-lts line. Upgrading within
+CKEditor 4 therefore does not close the exposure.
+
+The editors already open in **source mode**, so the plan is to drop WYSIWYG
+entirely:
+- Edit HTML as text in **CodeMirror 6** (MIT) — `html()` language, line numbers,
+  history, search, bracket matching, line wrapping.
+- A **Preview** toggle renders the HTML in a fully sandboxed iframe (`sandbox=""`,
+  `srcdoc`): no scripts, no forms, no navigation, opaque origin — stricter than
+  the `allow-same-origin` preview already used in `template_library.js`.
+- Keep the `{{.` autocomplete (the tag list currently in
+  `static/js/src/app/autocomplete.js`) as a CodeMirror completion source, and keep
+  the Insert-QR button (`insertText("{{.QR}}")`).
+
+**No npm tooling returns.** CodeMirror ships as prebuilt ES modules; vendor each
+package's `dist/index.js` + LICENSE under `static/js/src/vendor/codemirror/` and
+bundle them with the existing Go esbuild tool via `vendorModules` in
+`tools/assets/main.go` — exactly how `vendor/zxcvbn` + `app/passwords.js` work
+today. Getting the files in needs a one-time download outside the build sandbox
+(npm registry or release tarballs); versions get pinned in a `VERSIONS` file.
+Packages: `@codemirror/{state,view,language,commands,autocomplete,search,
+lang-html,lang-css,lang-javascript,lint}`,
+`@lezer/{common,highlight,lr,html,css,javascript}`, `style-mod`, `w3c-keyname`,
+`crelt`, `@marijn/find-cluster-break`.
+
+Work involved:
+- New `static/js/src/app/html_editor.js` (ES module →
+  `dist/app/html_editor.min.js`) exposing
+  `create`/`getValue`/`setValue`/`insertText`/`showSource`/`showPreview`; move
+  `TEMPLATE_TAGS` into it and delete `app/autocomplete.js`. Fix the completion
+  regex (`[A-z]` → `[A-Za-z]`, the CodeQL finding) along the way.
+- Add `html_editor.js` to `moduleScripts` and its vendor packages to
+  `vendorModules` in `tools/assets/main.go`; drop `autocomplete.js` from
+  `appScripts`.
+- Rework `static/js/src/app/templates.js` and `landing_pages.js`: create the
+  editor once; replace `$("#html_editor").val()` /
+  `CKEDITOR.instances[...].getData()` with the new API; import switches to Preview
+  instead of `setMode('wysiwyg')`. Remove CKEditor-only code — the
+  `https?://{{.URL}}` scheme fix, `CKEDITOR.on('dialogDefinition')`, and the
+  `.cke` clause in the `enforceFocus` overrides (also in `sending_profiles.js`).
+- Swap the script tags in `templates/templates.html` and `landing_pages.html`;
+  give the editor a fixed height in `static/css/main.css`.
+- Delete `static/js/src/vendor/ckeditor/` (also clears the CodeQL `wsc` alerts),
+  run `go run ./tools/assets`, commit regenerated bundles, `go test ./...`.
+
+**Behavior change to call out when built:** rich-text (WYSIWYG) editing and the
+link/image/table dialogs go away — operators edit HTML and preview it, and saved
+HTML is no longer normalized or wrapped in `<html><body>` by the editor. Since the
+editors already default to source mode, the day-to-day impact is small.
+
+**Alternative considered and rejected:** staying on CKEditor 4 (upgrade to
+4.22.1). It leaves CVE-2024-24815 open because of `fullPage`, keeps an unmaintained
+dependency, and the free line gets no further security fixes. CKEditor 5 /
+TinyMCE 7 are GPL-or-commercial and handle full-page HTML poorly. CodeMirror
+removes the XSS class rather than tracking CVEs.
+
+Recommendation: worth doing — it's the actual fix for the editor's security
+exposure, not just a version bump. Schedule it as its own change; the main cost is
+the one-time vendoring of CodeMirror.
+
 ## AI / automation
 
 ### MCP server endpoint (`gophish mcp`)
