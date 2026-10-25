@@ -67,6 +67,7 @@ var appScripts = []string{
 	"groups.js",
 	"landing_pages.js",
 	"people.js",
+	"schedules.js",
 	"sending_profiles.js",
 	"settings.js",
 	"teams.js",

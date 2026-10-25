@@ -356,6 +356,29 @@ var api = {
             return query("/webhooks/" + id + "/validate", "POST", {}, true)
         },
     },
+    // schedules contains the endpoints for /schedules
+    schedules: {
+        // get() - Queries the API for GET /schedules
+        get: function () {
+            return query("/schedules/", "GET", {}, false)
+        },
+        // post() - Posts a schedule to POST /schedules
+        post: function (schedule) {
+            return query("/schedules/", "POST", schedule, false)
+        },
+    },
+    // scheduleId contains the endpoints for /schedules/:id
+    scheduleId: {
+        get: function (id) {
+            return query("/schedules/" + id, "GET", {}, false)
+        },
+        put: function (schedule) {
+            return query("/schedules/" + schedule.id, "PUT", schedule, false)
+        },
+        delete: function (id) {
+            return query("/schedules/" + id, "DELETE", {}, false)
+        },
+    },
     // import handles all of the "import" functions in the api
     import_email: function (req) {
         return query("/import/email", "POST", req, false)

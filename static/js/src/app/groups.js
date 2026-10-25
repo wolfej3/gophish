@@ -84,6 +84,7 @@ var renderSyncStatus = function (source) {
 var setupDirectorySync = function (id) {
     $("#directorySyncPanel").addClass("hidden")
     $("#directoryExternalId").val("")
+    $("#directorySyncInterval").val("0")
     $("#directorySyncStatus").text("")
     $("#removeSourceButton").addClass("hidden")
     // New groups can't sync until they're saved and reopened.
@@ -107,6 +108,7 @@ var setupDirectorySync = function (id) {
                 .success(function (source) {
                     $("#directoryConnector").val(source.connector)
                     $("#directoryExternalId").val(source.external_id)
+                    $("#directorySyncInterval").val((source.sync_interval || 0).toString())
                     updateDirectoryHint()
                     renderSyncStatus(source)
                 })
@@ -354,7 +356,8 @@ $(document).ready(function () {
         if (id === -1) { return }
         api.groupId.setSource(id, {
             connector: $("#directoryConnector").val(),
-            external_id: $("#directoryExternalId").val()
+            external_id: $("#directoryExternalId").val(),
+            sync_interval: parseInt($("#directorySyncInterval").val()) || 0
         })
             .success(function (source) {
                 successFlashFade("Directory source saved", 2)

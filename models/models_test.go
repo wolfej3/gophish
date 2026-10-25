@@ -34,6 +34,8 @@ func (s *ModelsSuite) TearDownTest(c *check.C) {
 	for _, model := range []interface{}{
 		&Group{}, &Target{}, &GroupTarget{}, &SMTP{}, &Header{}, &Page{}, &Template{}, &Attachment{},
 		&Result{}, &Event{}, &MailLog{}, &Campaign{}, &Session{},
+		&CampaignSchedule{}, &ScheduleGroup{},
+		&DirectorySource{},
 		&Team{}, &TeamMember{},
 	} {
 		if err := cleanup.Delete(model).Error; err != nil {
@@ -146,6 +148,8 @@ func resetBenchmark(b *testing.B) {
 	for _, model := range []interface{}{
 		&Group{}, &Target{}, &GroupTarget{}, &SMTP{}, &Header{}, &Page{}, &Template{}, &Attachment{},
 		&Result{}, &Event{}, &MailLog{}, &Campaign{}, &Session{},
+		&CampaignSchedule{}, &ScheduleGroup{},
+		&DirectorySource{},
 		&Team{}, &TeamMember{},
 	} {
 		if err := cleanup.Delete(model).Error; err != nil {

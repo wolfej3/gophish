@@ -1,0 +1,119 @@
+{{define "body"}}
+<div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
+    <h1 class="page-header">
+        {{.Title}}
+    </h1>
+    <div id="flashes" class="row"></div>
+    <div class="row">
+        <button type="button" class="btn btn-primary" id="new_button" data-toggle="modal" data-backdrop="static"
+            data-schedule-id="-1" data-target="#modal">
+            <i class="fa fa-plus"></i> New Schedule</button>
+    </div>
+    &nbsp;
+    <div id="loading">
+        <i class="fa fa-spinner fa-spin fa-4x"></i>
+    </div>
+    <div class="row">
+        <table id="scheduleTable" class="table" style="display:none;">
+            <thead>
+                <tr>
+                    <th class="col-md-3 no-sort">Name</th>
+                    <th class="col-md-2 no-sort">Repeat</th>
+                    <th class="col-md-3 no-sort">Next Run</th>
+                    <th class="col-md-1 no-sort">Enabled</th>
+                    <th class="col-md-2 no-sort"></th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="modal" tabindex="-1" role="dialog" aria-labelledby="modalLabel">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+                <h4 class="modal-title" id="scheduleModalLabel">New Schedule</h4>
+            </div>
+            <div class="modal-body" id="modal_body">
+                <div class="row" id="modal.flashes"></div>
+                <label class="control-label" for="name">Name:</label>
+                <div class="form-group">
+                    <input type="text" class="form-control" placeholder="Quarterly Awareness Test" id="name" required autofocus />
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="control-label" for="repeat_interval">Repeat</label>
+                        <select class="form-control" id="repeat_interval">
+                            <option value="once">Once</option>
+                            <option value="daily">Daily</option>
+                            <option value="weekly" selected>Weekly</option>
+                            <option value="monthly">Monthly</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="control-label" for="first_launch">First Run
+                            <i class="fa fa-question-circle" data-toggle="tooltip" data-placement="right"
+                                title="When the first campaign launches. Repeating schedules run again each interval from this time."></i>
+                        </label>
+                        <input type="text" class="form-control" id="first_launch" />
+                    </div>
+                </div>
+                <p class="help-block" id="tz_note" style="margin-top:5px;"></p>
+
+                <label class="control-label" for="url">URL:</label>
+                <div class="form-group">
+                    <input type="text" class="form-control" placeholder="http://192.168.1.1" id="url" />
+                </div>
+
+                <label class="control-label" for="send_by_offset">Drip Over (minutes, optional)
+                    <i class="fa fa-question-circle" data-toggle="tooltip" data-placement="right"
+                        title="If set, each run spreads its emails evenly over this many minutes instead of sending all at once."></i>
+                </label>
+                <div class="form-group">
+                    <input type="number" min="0" class="form-control" placeholder="0" id="send_by_offset" />
+                </div>
+
+                <label class="control-label" for="template">Email Template:</label>
+                <div class="form-group">
+                    <select class="form-control" placeholder="Template Name" id="template"></select>
+                </div>
+
+                <label class="control-label" for="page">Landing Page:</label>
+                <div class="form-group">
+                    <select class="form-control" placeholder="Landing Page" id="page"></select>
+                </div>
+
+                <label class="control-label" for="profile">Sending Profile:</label>
+                <div class="form-group">
+                    <select class="form-control" placeholder="Sending Profile" id="profile"></select>
+                </div>
+
+                <label class="control-label" for="users">Groups:</label>
+                <select class="form-control" id="users" multiple="multiple"></select>
+
+                <div class="checkbox checkbox-primary" style="margin-top:15px;">
+                    <input type="checkbox" id="enabled" value="true" checked />
+                    <label for="enabled">Enabled
+                        <i class="fa fa-question-circle" data-toggle="tooltip" data-placement="right"
+                            title="Disabled schedules are kept but never launch until re-enabled."></i>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="modalSubmit">Save Schedule</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{end}} {{define "scripts"}}
+<script src="/js/dist/app/schedules.min.js"></script>
+{{end}}

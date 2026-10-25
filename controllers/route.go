@@ -83,7 +83,7 @@ func WithLimiter(limiter *ratelimit.PostLimiter) AdminServerOption {
 // NewAdminServer returns a new instance of the AdminServer with the
 // provided config and options applied.
 func NewAdminServer(config config.AdminServer, options ...AdminServerOption) *AdminServer {
-	defaultWorker, _ := worker.New()
+	defaultWorker, _ := worker.New(worker.WithDirectoryConnectors(config.Directory))
 	defaultServer := &http.Server{
 		ReadTimeout: 10 * time.Second,
 		Addr:        config.ListenURL,
@@ -164,6 +164,7 @@ func (as *AdminServer) registerRoutes() {
 	router.HandleFunc("/logout", mid.Use(as.Logout, mid.RequireLogin))
 	router.HandleFunc("/reset_password", mid.Use(as.ResetPassword, mid.RequireLogin))
 	router.HandleFunc("/campaigns", mid.Use(as.Campaigns, mid.RequireLogin))
+	router.HandleFunc("/schedules", mid.Use(as.Schedules, mid.RequireLogin))
 	router.HandleFunc("/people", mid.Use(as.People, mid.RequireLogin))
 	router.HandleFunc("/campaigns/{id:[0-9]+}", mid.Use(as.CampaignID, mid.RequireLogin))
 	router.HandleFunc("/templates", mid.Use(as.Templates, mid.RequireLogin))
@@ -266,6 +267,13 @@ func (as *AdminServer) Campaigns(w http.ResponseWriter, r *http.Request) {
 	params := newTemplateParams(r)
 	params.Title = "Campaigns"
 	getTemplate(w, "campaigns").ExecuteTemplate(w, "base", params)
+}
+
+// Schedules handles the default path and template for recurring campaign schedules
+func (as *AdminServer) Schedules(w http.ResponseWriter, r *http.Request) {
+	params := newTemplateParams(r)
+	params.Title = "Schedules"
+	getTemplate(w, "schedules").ExecuteTemplate(w, "base", params)
 }
 
 // CampaignID handles the default path and template execution

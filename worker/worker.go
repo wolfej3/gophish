@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/gophish/gophish/config"
+	"github.com/gophish/gophish/directory"
 	log "github.com/gophish/gophish/logger"
 	"github.com/gophish/gophish/mailer"
 	"github.com/gophish/gophish/models"
@@ -19,11 +21,12 @@ type Worker interface {
 
 // DefaultWorker is the background worker that handles watching for new campaigns and sending emails appropriately.
 type DefaultWorker struct {
-	mailer mailer.Mailer
+	mailer     mailer.Mailer
+	connectors []config.DirectoryConnector
 }
 
 // New creates a new worker object to handle the creation of campaigns
-func New(options ...func(Worker) error) (Worker, error) {
+func New(options ...func(*DefaultWorker) error) (Worker, error) {
 	defaultMailer := mailer.NewMailWorker()
 	w := &DefaultWorker{
 		mailer: defaultMailer,
@@ -42,6 +45,63 @@ func WithMailer(m mailer.Mailer) func(*DefaultWorker) error {
 	return func(w *DefaultWorker) error {
 		w.mailer = m
 		return nil
+	}
+}
+
+// WithDirectoryConnectors sets the directory connectors the worker uses to run
+// scheduled group syncs.
+func WithDirectoryConnectors(connectors []config.DirectoryConnector) func(*DefaultWorker) error {
+	return func(w *DefaultWorker) error {
+		w.connectors = connectors
+		return nil
+	}
+}
+
+// connectorByName returns the configured directory connector with the given
+// name, if any.
+func (w *DefaultWorker) connectorByName(name string) (config.DirectoryConnector, bool) {
+	for _, c := range w.connectors {
+		if c.Name == name {
+			return c, true
+		}
+	}
+	return config.DirectoryConnector{}, false
+}
+
+// syncDueDirectorySources refreshes the members of each group whose directory
+// sync interval has elapsed, keeping campaign recipient lists current without
+// operator intervention.
+func (w *DefaultWorker) syncDueDirectorySources(t time.Time) {
+	sources, err := models.GetDueDirectorySources(t)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	for _, source := range sources {
+		conn, ok := w.connectorByName(source.Connector)
+		if !ok {
+			log.WithFields(logrus.Fields{
+				"connector": source.Connector,
+				"group_id":  source.GroupId,
+			}).Warn("Skipping scheduled sync: connector is no longer configured")
+			continue
+		}
+		group, err := models.GetGroupById(source.GroupId)
+		if err != nil {
+			log.Error(err)
+			continue
+		}
+		log.WithFields(logrus.Fields{
+			"group":     group.Name,
+			"connector": source.Connector,
+		}).Info("Running scheduled directory sync")
+		// SyncGroup records the outcome (and LastSyncedAt) on the source, which
+		// determines when it next comes due.
+		if err := directory.SyncGroup(conn, source, &group); err != nil {
+			log.WithFields(logrus.Fields{
+				"group": group.Name,
+			}).Errorf("scheduled directory sync failed: %v", err)
+		}
 	}
 }
 
@@ -99,12 +159,51 @@ func (w *DefaultWorker) processCampaigns(t time.Time) error {
 	return nil
 }
 
+// launchDueSchedules spawns a campaign from each recurring schedule whose next
+// launch time has arrived, then advances the schedule to its next occurrence.
+// Each run resolves the schedule's template, page, sending profile, and groups
+// by name, so it picks up current group membership at launch time.
+func (w *DefaultWorker) launchDueSchedules(t time.Time) {
+	schedules, err := models.GetDueSchedules(t)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+	for i := range schedules {
+		s := &schedules[i]
+		c := s.BuildCampaign(t.UTC())
+		err := models.PostCampaign(&c, s.UserId, s.TeamId)
+		if err != nil {
+			log.WithFields(logrus.Fields{
+				"schedule": s.Name,
+			}).Errorf("error launching scheduled campaign: %v", err)
+			// Advance anyway so a broken schedule doesn't retry every minute.
+			if aerr := s.AdvanceSchedule(t); aerr != nil {
+				log.Error(aerr)
+			}
+			continue
+		}
+		log.WithFields(logrus.Fields{
+			"schedule": s.Name,
+			"campaign": c.Name,
+		}).Info("Launching scheduled campaign")
+		if c.Status == models.CampaignInProgress {
+			w.LaunchCampaign(c)
+		}
+		if aerr := s.AdvanceSchedule(t); aerr != nil {
+			log.Error(aerr)
+		}
+	}
+}
+
 // Start launches the worker to poll the database every minute for any pending maillogs
 // that need to be processed.
 func (w *DefaultWorker) Start() {
 	log.Info("Background Worker Started Successfully - Waiting for Campaigns")
 	go w.mailer.Start(context.Background())
 	for t := range time.Tick(1 * time.Minute) {
+		w.launchDueSchedules(t)
+		w.syncDueDirectorySources(t)
 		err := w.processCampaigns(t)
 		if err != nil {
 			log.Error(err)

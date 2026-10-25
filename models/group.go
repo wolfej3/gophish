@@ -160,6 +160,23 @@ func GetGroup(id int64, tid int64) (Group, error) {
 	return g, nil
 }
 
+// GetGroupById returns the group with the given id regardless of team. It is
+// used by the background worker, which has no team context; it is not exposed
+// through the API, where team scoping is always enforced.
+func GetGroupById(id int64) (Group, error) {
+	g := Group{}
+	err := db.Where("id=?", id).Take(&g).Error
+	if err != nil {
+		log.Error(err)
+		return g, err
+	}
+	g.Targets, err = GetTargets(g.Id)
+	if err != nil {
+		log.Error(err)
+	}
+	return g, nil
+}
+
 // GetGroupSummary returns the summary for the requested group
 func GetGroupSummary(id int64, tid int64) (GroupSummary, error) {
 	g := GroupSummary{}
