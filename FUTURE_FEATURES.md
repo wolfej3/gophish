@@ -52,6 +52,64 @@ The SMS channel ships with Twilio behind a small provider interface. Additional
 providers (Vonage/Nexmo, AWS SNS, MessageBird, Telnyx, …) can be added as new
 implementations of that interface without touching the send pipeline.
 
+### Gmail direct inbox injection (DMI)
+Confirmed with the user: "DMI" = **direct mailbox injection** — for authorized
+internal Google Workspace simulations, drop the lure straight into the target's
+Gmail inbox via the Gmail API instead of delivering over SMTP/`messages.send`. It
+bypasses spam/filtering (so an internal test isn't skewed by the org's own
+gateways and delivery is guaranteed). Built as an **alternative delivery mode on
+the existing Gmail sending profile**, not a new transport. Planned in detail,
+then paused.
+
+**Key difference from the current Gmail sender** (`sender/gmail.go`): today's
+sender calls `users/me/messages/send` and, via domain-wide delegation,
+impersonates the **sender** (`GmailConfig.From`, baked into the client once at
+dial time). DMI uses `users/me/messages/insert`, which writes into a mailbox
+without delivering — so it must impersonate the **recipient**, and the recipient
+differs per message. Consequences:
+- Different scope: `https://www.googleapis.com/auth/gmail.insert` (not
+  `gmail.send`).
+- The service account's domain-wide delegation must cover the **recipients'**
+  mailboxes (same Workspace) for that scope. `FromAddress` is just the lure's
+  From header in insert mode (no delegation needed over it).
+- The delegated subject can't be fixed at dial time; the sender mints a
+  per-recipient client at send time.
+
+**Design:**
+- *Model + migration:* add `GmailInsert bool json:"gmail_insert" gorm:"column:gmail_insert"`
+  to `SMTP` (`models/smtp.go`); new dual migration (next timestamp after
+  `20261106000000_0.15.0_sms_lures.sql`, e.g. `20261107000000_0.16.0_gmail_insert.sql`)
+  `ALTER TABLE smtp ADD COLUMN gmail_insert boolean NOT NULL DEFAULT 0;`
+  (dialect idioms: backticks vs quotes). No new validation (a Gmail DMI profile
+  still just needs `credentials_file` + `FromAddress`).
+- *Dialer wiring:* `GetDialer()` `GmailInterface` case passes `Insert: s.GmailInsert`
+  into `sender.GmailConfig`.
+- *Sender (`sender/gmail.go`):* add `Insert bool` to `GmailConfig` and
+  `const gmailInsertScope`. In `NewGmailDialer`, pick the scope by mode. Send
+  mode = unchanged (`Subject = From`, `gmailSender`). Insert mode returns a
+  `gmailInsertSender` holding the parsed `*jwt.Config` (insert scope, empty
+  Subject) + baseURL/TokenURL; its `Send(from, to, msg)` computes `mimeBytes`
+  once, then for each recipient copies the jwt config with `Subject = recipient`,
+  builds `cfg.Client(ctx)`, and POSTs `{baseURL}/users/me/messages/insert` with
+  `{"raw": <base64url>, "labelIds": ["INBOX","UNREAD"]}`; non-2xx → error with
+  the API message (mirror `messages.send`). Reuse `noopCloser`, `apiTimeout`,
+  `mimeBytes`. QR/tracking already live in the MIME, so DMI inherits them.
+- *UI:* a checkbox in the `.transport-gmail` block of
+  `templates/sending_profiles.html` ("Deliver by direct inbox injection (DMI)")
+  wired in `static/js/src/app/sending_profiles.js` (load/save/clear
+  `profile.gmail_insert`; regenerate the bundle), with help text about the
+  `gmail.insert` scope + recipient-mailbox delegation and that it's for
+  authorized internal Workspace tests.
+- *Docs:* extend the README "Sending through Microsoft Graph or Gmail" section.
+- *Tests:* mirror `TestGmailSend` (stubs `TokenURL`+`BaseURL` with `httptest`;
+  runs in CI, not the sandbox) asserting the request hits `…/messages/insert`,
+  carries `labelIds ["INBOX","UNREAD"]` + the raw MIME, and mints a per-recipient
+  client (recipient as the delegated subject).
+
+**Recommendation / when to build:** self-contained and medium-sized; prerequisites
+are a Workspace + a service account with domain-wide delegation for `gmail.insert`
+over the test recipients. The full plan above can be executed as written.
+
 ### MFA / 2FA lures
 Simulate real-time credential-plus-OTP capture (e.g. an attacker-in-the-middle
 style flow) rather than only static credential capture. Deferred from phase 4.
