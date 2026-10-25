@@ -1,8 +1,8 @@
 package auth
 
 import (
-	"time"
 	"testing"
+	"time"
 )
 
 func TestPasswordPolicy(t *testing.T) {
