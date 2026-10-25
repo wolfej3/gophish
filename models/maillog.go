@@ -257,6 +257,10 @@ func (m *MailLog) Generate(msg *gomail.Message) error {
 		} else {
 			msg.AddAlternative("text/html", html)
 		}
+		// Embed a QR image if the template references {{.QR}}.
+		if err := embedQR(msg, html, ptx); err != nil {
+			log.Warn(err)
+		}
 	}
 	// Attach the files
 	for _, a := range c.Template.Attachments {

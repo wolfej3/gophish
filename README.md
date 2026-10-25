@@ -19,6 +19,7 @@ This version modernizes Gophish and adds admin security features. The details ar
 - **Sessions:** admin sessions are stored in the database, survive restarts, and are revoked on logout, password change, and account lock.
 - **Admin security:** two-factor authentication, single sign-on through OIDC or SAML, an audit log, and API keys with limited permissions.
 - **Teams and tenants:** objects are shared within teams instead of per login, teams nest under isolated client **tenants**, and a provider-admin role spans every tenant. Each user also gets a private Personal team. See [Teams](#teams) and [Tenants](#tenants).
+- **QR code lures:** email templates can embed a per-recipient QR code (`{{.QR}}`) that encodes the recipient's tracked link, to simulate "quishing". See [QR code lures](#qr-code-lures).
 
 #### Upgrading
 
@@ -201,6 +202,18 @@ Connectors go under `admin_server`:
 - **`ldap` (any LDAP directory, including Active Directory):** the defaults match Active Directory — members are found with `(&(objectClass=user)(memberOf=%s))` and read from `mail`, `givenName`, and `sn`. The directory group is its **distinguished name**. Override `user_filter`, `email_attribute`, `first_name_attribute`, and `last_name_attribute` for other LDAP schemas; `start_tls` and `insecure_tls` control the connection. Gophish refuses a plaintext `ldap://` connection unless you set `start_tls` or `insecure_tls`, and warns at startup when `insecure_tls` is used.
 
 Setting a source or syncing takes the editor role on the group's team. Directory sync runs when you click **Sync Now**; scheduled syncing will come with the scheduling feature.
+
+### QR code lures
+
+Real phishing increasingly hides the link inside a QR code ("quishing"): the destination isn't a scannable `<a href>`, so it slips past URL filters, and the target scans it with a phone that's usually outside corporate protection. Gophish can simulate this.
+
+Put `{{.QR}}` in an email template's HTML where you want the code (the editor's **Insert QR Code** button adds it at the cursor). Each sent message gets an inline QR image encoding **that recipient's** tracked link — the same URL a click would use, recipient ID included. Scanning it lands on the landing page and records a visit exactly like a click.
+
+Notes:
+
+- The QR is embedded as an inline image (`cid:`), not a `data:` URI, so it renders in Gmail and Outlook, which strip `data:` image sources.
+- A template without `{{.QR}}` is sent unchanged — no QR image is attached.
+- Opens may not register before the scan, since no tracking pixel is fetched until the recipient lands on the page.
 
 ### Admin Security
 

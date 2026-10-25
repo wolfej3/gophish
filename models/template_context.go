@@ -22,6 +22,7 @@ type PhishingTemplateContext struct {
 	From        string
 	URL         string
 	Tracker     string
+	QR          string
 	TrackingURL string
 	RId         string
 	BaseURL     string
@@ -68,6 +69,7 @@ func NewPhishingTemplateContext(ctx TemplateContext, r BaseRecipient, rid string
 		URL:           phishURL.String(),
 		TrackingURL:   trackingURL.String(),
 		Tracker:       "<img alt='' style='display: none' src='" + trackingURL.String() + "'/>",
+		QR:            "<img alt='' src='" + qrCIDRef + "'/>",
 		From:          fn,
 		RId:           rid,
 	}, nil

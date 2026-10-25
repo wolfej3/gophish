@@ -169,6 +169,10 @@ func (s *EmailRequest) Generate(msg *gomail.Message) error {
 		} else {
 			msg.AddAlternative("text/html", html)
 		}
+		// Embed a QR image if the template references {{.QR}}.
+		if err := embedQR(msg, html, ptx); err != nil {
+			log.Error(err)
+		}
 	}
 
 	// Attach the files

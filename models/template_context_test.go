@@ -41,6 +41,7 @@ func (s *ModelsSuite) TestNewTemplateContext(c *check.C) {
 		RId:           r.RId,
 	}
 	expected.Tracker = "<img alt='' style='display: none' src='" + expected.TrackingURL + "'/>"
+	expected.QR = "<img alt='' src='" + qrCIDRef + "'/>"
 	got, err := NewPhishingTemplateContext(ctx, r.BaseRecipient, r.RId)
 	c.Assert(err, check.Equals, nil)
 	c.Assert(got, check.DeepEquals, expected)

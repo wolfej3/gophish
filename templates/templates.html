@@ -81,6 +81,13 @@
                     <input id="use_tracker_checkbox" type="checkbox" checked>
                     <label for="use_tracker_checkbox">Add Tracking Image</label>
                 </div>
+                <div style="margin-bottom:10px;">
+                    <button type="button" class="btn btn-default btn-sm" id="insert_qr_button">
+                        <i class="fa fa-qrcode"></i> Insert QR Code</button>
+                    <span class="help-block" style="display:inline; margin-left:8px;">Inserts
+                        <code>{{"{{"}}.QR{{"}}"}}</code> at the cursor. Each email gets a QR image encoding
+                        that recipient's tracked link; scans are recorded like clicks.</span>
+                </div>
                 <span class="btn btn-danger btn-file"><i class="fa fa-plus"></i> Add Files
                     <input id="attachmentUpload" type="file" onchange="attach(this.files)" multiple>
                 </span>

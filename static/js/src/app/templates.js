@@ -353,6 +353,16 @@ function load() {
 }
 
 $(document).ready(function () {
+    // Insert the {{.QR}} variable at the cursor in the HTML editor. Unlike the
+    // tracking image, the author places the QR where the call to action is, so
+    // this inserts rather than auto-appending.
+    $(document).on("click", "#insert_qr_button", function () {
+        $('a[href="#html"]').tab("show");
+        var editor = CKEDITOR.instances["html_editor"];
+        if (editor) {
+            editor.insertText("{{.QR}}");
+        }
+    });
     // Setup multiple modals
     // Code based on http://miles-by-motorcycle.com/static/bootstrap-modal/index.html
     $('.modal').on('hidden.bs.modal', function (event) {
