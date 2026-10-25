@@ -30,6 +30,10 @@ type AdminServer struct {
 	// TemplateLibrary configures the git-backed catalog operators import
 	// email templates from. Nil disables the feature.
 	TemplateLibrary *TemplateLibrary `json:"template_library"`
+	// AuditLogRetentionDays deletes audit log entries older than this many
+	// days, pruned at startup and once a day after. Zero (the default) keeps
+	// entries forever.
+	AuditLogRetentionDays int `json:"audit_log_retention_days"`
 }
 
 // TemplateLibrary configures a git repository that serves as a shared,

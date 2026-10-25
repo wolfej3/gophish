@@ -165,6 +165,7 @@ Gophish reads a single JSON file (`config.json` by default, or the path passed w
 | `trusted_origins` | `[]` | Extra browser-facing hosts (`host[:port]`) accepted by CSRF when behind a host-rewriting proxy. |
 | `trusted_proxies` | `[]` | CIDRs/IPs of proxies whose forwarded-for headers are trusted. See [Reverse proxies](#reverse-proxies-and-client-ips). |
 | `allowed_internal_hosts` | `[]` | Internal hosts server-side fetches (Import Site, webhooks) may reach; otherwise internal/loopback/metadata addresses are blocked. |
+| `audit_log_retention_days` | `0` | Delete audit log entries older than this many days (pruned at startup and daily). `0` keeps them forever. |
 | `oidc` | `null` | OpenID Connect SSO (below). |
 | `saml` | `null` | SAML 2.0 SSO (below). |
 | `directory` | `[]` | Directory connectors for group sync (below). See [Directory Sync](#directory-sync). |

@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	log "github.com/gophish/gophish/logger"
+)
 
 // Audit log actions. API requests that change something are recorded with
 // AuditAPIRequest; the others record events in the admin interface.
@@ -48,6 +52,49 @@ func PutAuditLog(a *AuditLog) error {
 		a.CreatedAt = time.Now().UTC()
 	}
 	return db.Create(a).Error
+}
+
+// DeleteOldAuditLogs deletes audit log entries older than retentionDays. A
+// retentionDays of zero or less keeps entries forever and deletes nothing. It
+// returns the number of rows removed.
+func DeleteOldAuditLogs(retentionDays int) (int64, error) {
+	if retentionDays <= 0 {
+		return 0, nil
+	}
+	cutoff := time.Now().UTC().AddDate(0, 0, -retentionDays)
+	result := db.Where("created_at < ?", cutoff).Delete(&AuditLog{})
+	return result.RowsAffected, result.Error
+}
+
+// auditCleanupInterval is how often the background cleanup runs. It's a var so
+// tests can lower it.
+var auditCleanupInterval = 24 * time.Hour
+
+// StartAuditLogCleanup prunes audit log entries older than retentionDays now and
+// then once per day in the background. It's a no-op when retention isn't set, so
+// the default behavior (keep everything) is unchanged.
+func StartAuditLogCleanup(retentionDays int) {
+	if retentionDays <= 0 {
+		return
+	}
+	prune := func() {
+		n, err := DeleteOldAuditLogs(retentionDays)
+		if err != nil {
+			log.Errorf("error pruning audit logs: %v", err)
+			return
+		}
+		if n > 0 {
+			log.Infof("pruned %d audit log entries older than %d days", n, retentionDays)
+		}
+	}
+	prune()
+	go func() {
+		ticker := time.NewTicker(auditCleanupInterval)
+		defer ticker.Stop()
+		for range ticker.C {
+			prune()
+		}
+	}()
 }
 
 // AuditLogQuery filters the audit log entries returned by GetAuditLogs.

@@ -199,6 +199,8 @@ func Setup(c *config.Config) error {
 		log.Error(err)
 		return err
 	}
+	// Prune old audit log entries now and once a day, if retention is set.
+	StartAuditLogCleanup(conf.AdminConf.AuditLogRetentionDays)
 	// Create the admin user if it doesn't exist. The bootstrap admin is the
 	// provider admin: the hosting operator who spans every tenant.
 	var userCount int64

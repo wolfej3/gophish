@@ -244,7 +244,7 @@ const load = () => {
                     escapeHtml(user.role.name),
                     lastlogin,
                     signInMethods(user),
-                    "<div class='pull-right'>\
+                    "<div class='pull-right' style='white-space:nowrap'>\
                     <button class='btn btn-warning impersonate_button' data-user-id='" + user.id + "'>\
                     <i class='fa fa-retweet'></i>\
                     </button>\

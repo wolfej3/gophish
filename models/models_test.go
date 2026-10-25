@@ -37,6 +37,7 @@ func (s *ModelsSuite) TearDownTest(c *check.C) {
 		&CampaignSchedule{}, &ScheduleGroup{},
 		&DirectorySource{},
 		&Team{}, &TeamMember{}, &Tenant{},
+		&AuditLog{},
 	} {
 		if err := cleanup.Delete(model).Error; err != nil {
 			panic(err)
@@ -154,6 +155,7 @@ func resetBenchmark(b *testing.B) {
 		&CampaignSchedule{}, &ScheduleGroup{},
 		&DirectorySource{},
 		&Team{}, &TeamMember{}, &Tenant{},
+		&AuditLog{},
 	} {
 		if err := cleanup.Delete(model).Error; err != nil {
 			panic(err)

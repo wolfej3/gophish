@@ -2,9 +2,32 @@ package models
 
 import (
 	"fmt"
+	"time"
 
 	"gopkg.in/check.v1"
 )
+
+func (s *ModelsSuite) TestDeleteOldAuditLogs(c *check.C) {
+	old := &AuditLog{Username: "old", Action: AuditLogin, CreatedAt: time.Now().UTC().AddDate(0, 0, -40)}
+	recent := &AuditLog{Username: "recent", Action: AuditLogin, CreatedAt: time.Now().UTC().AddDate(0, 0, -5)}
+	c.Assert(PutAuditLog(old), check.Equals, nil)
+	c.Assert(PutAuditLog(recent), check.Equals, nil)
+
+	// Zero retention keeps everything.
+	n, err := DeleteOldAuditLogs(0)
+	c.Assert(err, check.Equals, nil)
+	c.Assert(n, check.Equals, int64(0))
+
+	// A 30-day retention removes only the 40-day-old entry.
+	n, err = DeleteOldAuditLogs(30)
+	c.Assert(err, check.Equals, nil)
+	c.Assert(n, check.Equals, int64(1))
+
+	logs, err := GetAuditLogs(AuditLogQuery{})
+	c.Assert(err, check.Equals, nil)
+	c.Assert(len(logs), check.Equals, 1)
+	c.Assert(logs[0].Username, check.Equals, "recent")
+}
 
 func (s *ModelsSuite) TestAuditLogPagingAndFilters(c *check.C) {
 	for i := 0; i < 5; i++ {
