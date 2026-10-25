@@ -272,6 +272,23 @@ func (as *Server) User(w http.ResponseWriter, r *http.Request) {
 		}
 		existingUser.Role = role
 		existingUser.RoleID = role.ID
+		// A provider admin may move the user to another tenant. This carries the
+		// user's personal team across and drops their old-tenant team
+		// memberships, so it also resets their default team.
+		tenantMoved := false
+		if isProviderAdmin(r) && ur.TenantId != 0 && ur.TenantId != existingUser.TenantId {
+			if _, err := models.GetTenant(ur.TenantId); err != nil {
+				JSONResponse(w, models.Response{Success: false, Message: "Invalid tenant"}, http.StatusBadRequest)
+				return
+			}
+			if err := models.MoveUserToTenant(existingUser.Id, ur.TenantId); err != nil {
+				JSONResponse(w, models.Response{Success: false, Message: err.Error()}, http.StatusInternalServerError)
+				return
+			}
+			existingUser.TenantId = ur.TenantId
+			existingUser.DefaultTeamId = 0
+			tenantMoved = true
+		}
 		// We don't force the password to be provided, since it may be an admin
 		// managing the user's account, and making a simple change like
 		// updating the username or role. However, if it _is_ provided, we'll
@@ -310,7 +327,10 @@ func (as *Server) User(w http.ResponseWriter, r *http.Request) {
 			mid.AuditUser(r, models.AuditSSOUnlinked, existingUser.Username, "unlinked by an admin")
 		}
 		// A default team can be set, but only to a team the user can access.
-		if ur.DefaultTeamId != 0 && ur.DefaultTeamId != existingUser.DefaultTeamId {
+		// Skip this when the user was just moved to another tenant: the move
+		// reset their default team, and a requested one would belong to the old
+		// tenant.
+		if !tenantMoved && ur.DefaultTeamId != 0 && ur.DefaultTeamId != existingUser.DefaultTeamId {
 			teams, terr := models.GetUserTeams(existingUser)
 			if terr != nil {
 				JSONResponse(w, models.Response{Success: false, Message: terr.Error()}, http.StatusInternalServerError)

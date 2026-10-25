@@ -18,8 +18,9 @@ const save = (id) => {
         disable_totp: $("#disable_totp_checkbox").prop('checked'),
         unlink_oidc: $("#unlink_oidc_checkbox").prop('checked')
     }
-    // A provider admin chooses which tenant a new user joins.
-    if (isProvider && id == -1) {
+    // A provider admin chooses which tenant a user belongs to, whether creating
+    // a new user or moving an existing one.
+    if (isProvider) {
         user.tenant_id = parseInt($("#tenantSelect").val(), 10) || 0
     }
     // Submit the user
@@ -78,17 +79,20 @@ const edit = (id) => {
         $("#userModalLabel").text("New User")
         $("#role").val("user")
         $("#role").trigger("change")
-        // A provider admin picks the tenant for a new user; it can't be changed
-        // afterward, so the selector only shows when creating.
+        // A provider admin picks the tenant for a new user.
         $("#tenantSelectGroup").toggle(isProvider)
     } else {
-        $("#tenantSelectGroup").hide()
+        // A provider admin can move an existing user to a different tenant.
+        $("#tenantSelectGroup").toggle(isProvider)
         $("#userModalLabel").text("Edit User")
         api.userId.get(id)
             .success((user) => {
                 $("#username").val(user.username)
                 $("#role").val(user.role.slug)
                 $("#role").trigger("change")
+                if (isProvider) {
+                    $("#tenantSelect").val(user.tenant_id)
+                }
                 $("#force_password_change_checkbox").prop('checked', user.password_change_required)
                 $("#account_locked_checkbox").prop('checked', user.account_locked)
                 $("#disable_totp_group").toggleClass("hidden", !user.totp_enabled)

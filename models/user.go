@@ -3,6 +3,8 @@ package models
 import (
 	"errors"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 // ErrModifyingOnlyAdmin occurs when there is an attempt to modify the only
@@ -212,4 +214,39 @@ func DeleteUser(id int64) error {
 	// Finally, delete the user
 	err = db.Where("id=?", id).Delete(&User{}).Error
 	return err
+}
+
+// MoveUserToTenant moves a user to another tenant. Only a provider admin drives
+// this, since they span tenants. The user's private personal team moves with
+// them; their memberships in the old tenant's shared teams are dropped (those
+// teams stay in the old tenant); and their default team is reset, because it
+// may have pointed at a team they no longer belong to. Objects live on their
+// teams, so the user's personal-team work follows them while their shared-team
+// work stays with the old tenant's teams.
+func MoveUserToTenant(uid, tenantID int64) error {
+	u, err := GetUser(uid)
+	if err != nil {
+		return err
+	}
+	if u.TenantId == tenantID {
+		return nil
+	}
+	if _, err := GetTenant(tenantID); err != nil {
+		return err
+	}
+	// Make sure the user has a personal team to carry across.
+	personal, err := EnsurePersonalTeam(u)
+	if err != nil {
+		return err
+	}
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&Team{}).Where("id = ?", personal.Id).Update("tenant_id", tenantID).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("user_id = ? AND team_id <> ?", uid, personal.Id).Delete(&TeamMember{}).Error; err != nil {
+			return err
+		}
+		return tx.Model(&User{}).Where("id = ?", uid).
+			Updates(map[string]interface{}{"tenant_id": tenantID, "default_team_id": 0}).Error
+	})
 }

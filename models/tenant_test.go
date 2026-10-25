@@ -37,6 +37,51 @@ func containsTeam(teams []TeamMembership, id int64) bool {
 	return false
 }
 
+func (s *ModelsSuite) TestMoveUserToTenant(c *check.C) {
+	tenantA := s.makeTenant(c, "Tenant A")
+	tenantB := s.makeTenant(c, "Tenant B")
+	user := s.makeUser(c, "mover", RoleUser, tenantA.Id)
+
+	// The user owns a personal team in tenant A and is a member of A's shared
+	// team, which is also their default.
+	personal, err := EnsurePersonalTeam(user)
+	c.Assert(err, check.Equals, nil)
+	c.Assert(personal.TenantId, check.Equals, tenantA.Id)
+	sharedA, err := GetSharedTeamsByTenant(tenantA.Id)
+	c.Assert(err, check.Equals, nil)
+	c.Assert(len(sharedA) >= 1, check.Equals, true)
+	c.Assert(SetTeamMember(sharedA[0].Id, user.Id, TeamRoleEditor), check.Equals, nil)
+	user.DefaultTeamId = sharedA[0].Id
+	c.Assert(PutUser(&user), check.Equals, nil)
+
+	// A non-existent tenant is rejected.
+	c.Assert(MoveUserToTenant(user.Id, 999999) != nil, check.Equals, true)
+
+	// Move the user to tenant B.
+	c.Assert(MoveUserToTenant(user.Id, tenantB.Id), check.Equals, nil)
+
+	moved, err := GetUser(user.Id)
+	c.Assert(err, check.Equals, nil)
+	c.Assert(moved.TenantId, check.Equals, tenantB.Id)
+	// The default team was reset, since it belonged to the old tenant.
+	c.Assert(moved.DefaultTeamId, check.Equals, int64(0))
+
+	// The personal team came along.
+	movedPersonal, err := EnsurePersonalTeam(moved)
+	c.Assert(err, check.Equals, nil)
+	c.Assert(movedPersonal.Id, check.Equals, personal.Id)
+	c.Assert(movedPersonal.TenantId, check.Equals, tenantB.Id)
+
+	// The old shared-team membership was dropped; the personal one stayed.
+	teams, err := GetUserTeams(moved)
+	c.Assert(err, check.Equals, nil)
+	c.Assert(containsTeam(teams, sharedA[0].Id), check.Equals, false)
+	c.Assert(containsTeam(teams, personal.Id), check.Equals, true)
+
+	// Moving to the same tenant is a no-op.
+	c.Assert(MoveUserToTenant(moved.Id, tenantB.Id), check.Equals, nil)
+}
+
 func (s *ModelsSuite) TestTenantValidation(c *check.C) {
 	empty := Tenant{Name: "   "}
 	c.Assert(PostTenant(&empty), check.Equals, ErrTenantName)

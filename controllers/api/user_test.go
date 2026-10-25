@@ -227,6 +227,40 @@ func TestTenantAdminCannotTouchProviderAdmin(t *testing.T) {
 	}
 }
 
+// TestProviderAdminMovesUserTenant verifies a provider admin can move an
+// existing user to another tenant via the edit (PUT) path.
+func TestProviderAdminMovesUserTenant(t *testing.T) {
+	testCtx := setupTest(t)
+	// testCtx.admin (user 1) is the provider admin.
+	target := createUnpriviledgedUser(t, models.RoleUser)
+	other := models.Tenant{Name: "Client B"}
+	if err := models.PostTenant(&other); err != nil {
+		t.Fatalf("error creating tenant: %v", err)
+	}
+
+	body, _ := json.Marshal(userRequest{
+		Username: target.Username,
+		Role:     models.RoleUser,
+		TenantId: other.Id,
+	})
+	r := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/users/%d", target.Id), bytes.NewBuffer(body))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("Authorization", "Bearer "+testCtx.apiKey)
+	w := httptest.NewRecorder()
+	testCtx.apiServer.ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("moving user to another tenant: expected 200, got %d", w.Code)
+	}
+
+	got, err := models.GetUser(target.Id)
+	if err != nil {
+		t.Fatalf("error reloading user: %v", err)
+	}
+	if got.TenantId != other.Id {
+		t.Fatalf("expected tenant %d, got %d", other.Id, got.TenantId)
+	}
+}
+
 // TestUnauthorizedListUsers ensures that users without the ModifySystem
 // permission are unable to list the users registered in Gophish.
 func TestUnauthorizedListUsers(t *testing.T) {
