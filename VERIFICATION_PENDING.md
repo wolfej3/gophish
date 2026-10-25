@@ -44,3 +44,25 @@ Still to run:
 Note: 5 pre-existing tests (`sender`, `webhook`, `directory`, and two in
 `controllers`) use `httptest` servers and also need local port binding; they
 fail only in the sandbox, not in CI.
+
+## Docker Compose stack (phase 4 #12)
+
+Already verified: `docker compose config` parses both the base file and the
+base+proxy overlay; `config.example.json` is valid JSON and loads in gophish
+(it starts, connects to SQLite, and runs all migrations, failing only at the
+sandbox-blocked port bind).
+
+Still to run (needs Docker):
+
+```bash
+cp .env.example .env      # edit the passwords
+docker compose up -d --build
+```
+
+- Browse https://localhost:3333, accept the self-signed cert, log in as `admin`
+  with `GOPHISH_INITIAL_ADMIN_PASSWORD`.
+- Confirm MySQL is in use: data survives `docker compose restart`, and the
+  `gophish` database has tables.
+- Reverse-proxy overlay: `docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d --build`,
+  then confirm the admin UI is reachable through Caddy over HTTPS with
+  gophish's own `use_tls` off.

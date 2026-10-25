@@ -62,6 +62,26 @@ The MySQL server needs the `sql_mode` described under [Database](#database).
 ### Docker
 This is a fork with additional security and feature changes (see [Security](#security)). The upstream `gophish/gophish` Docker image does not include these changes; build this fork's image yourself from the included `Dockerfile` (`docker build -t gophish .`). The Docker build compiles the admin assets with Go, so it no longer needs a Node.js stage.
 
+The `docker/run.sh` entrypoint maps environment variables into `config.json` at startup: `ADMIN_LISTEN_URL`, `ADMIN_USE_TLS`, `ADMIN_CERT_PATH`, `ADMIN_KEY_PATH`, `ADMIN_TRUSTED_ORIGINS`, `ADMIN_TRUSTED_PROXIES`, the `PHISH_*` equivalents, `CONTACT_ADDRESS`, `DB_NAME`, and `DB_FILE_PATH` (the `db_path` / DSN). Set `GOPHISH_INITIAL_ADMIN_PASSWORD` to choose the first-run admin password instead of reading it from the logs. Features configured by larger blocks (OIDC, SAML, directory connectors, the template library) aren't env-mapped — mount your own `config.json` over `/opt/gophish/config.json` for those.
+
+#### Running with Docker Compose
+A ready-to-run stack (admin + phishing servers backed by MySQL) is included as `docker-compose.yml`:
+
+```bash
+cp .env.example .env     # then edit the passwords in .env
+docker compose up -d --build
+```
+
+Open https://localhost:3333, accept the self-signed certificate, and log in as `admin` with the `GOPHISH_INITIAL_ADMIN_PASSWORD` you set. The phishing server is published on http://localhost:8080. Data persists in MySQL (the `db_data` volume); the admin server's self-signed certificate is regenerated when the container is rebuilt.
+
+For real (non-self-signed) TLS, add the Caddy reverse-proxy overlay, which terminates HTTPS in front of the admin server (gophish then runs with admin TLS off and trusts the proxy):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d --build
+```
+
+It serves https://localhost through Caddy's local CA by default. For a public domain, set `CADDY_SITE_ADDRESS` in `.env` and remove the `tls internal` line from the `Caddyfile` to get an automatic Let's Encrypt certificate.
+
 ### Setup
 After running the Gophish binary, open an Internet browser to https://localhost:3333 and login with the default username and password listed in the log output.
 e.g.
@@ -119,6 +139,76 @@ Set `trusted_proxies` on `admin_server` and/or `phish_server` to the proxies' ad
 With `trusted_proxies` empty (the default), forwarded-for headers are ignored and the direct peer is always used, so no one can spoof their IP. A bad CIDR makes Gophish exit at startup with a clear error. In Docker, set `ADMIN_TRUSTED_PROXIES` / `PHISH_TRUSTED_PROXIES` to a comma-separated list.
 
 Gophish reads the **first** entry of `X-Forwarded-For`. With nginx, set `proxy_set_header X-Forwarded-For $remote_addr;` (not `$proxy_add_x_forwarded_for`, which lets a client prepend a forged address).
+
+### Configuration reference
+
+Gophish reads a single JSON file (`config.json` by default, or the path passed with `--config`). [`config.example.json`](config.example.json) is a complete, valid starting point with every option present; copy it and edit. The file is strict JSON — no comments. Optional feature blocks are disabled by leaving them `null` (`oidc`, `saml`, `template_library`) or empty (`directory`, and the list fields). Every field below maps to the documented sections above.
+
+**Top level**
+
+| Field | Default | Description |
+|---|---|---|
+| `db_name` | `sqlite3` | `sqlite3` or `mysql`. See [Database](#database). |
+| `db_path` | `gophish.db` | SQLite file, or the MySQL DSN when `db_name` is `mysql`. |
+| `db_sslca_path` | `""` | Path to a CA cert to verify a TLS MySQL connection. |
+| `contact_address` | `""` | Address shown to recipients in the `X-Gophish-Contact` header. |
+| `logging.filename` | `""` | Log file path; empty logs to stdout. |
+| `logging.level` | `""` | `debug`, `info`, `warning`, or `error`. |
+
+**`admin_server`**
+
+| Field | Default | Description |
+|---|---|---|
+| `listen_url` | `127.0.0.1:3333` | Address the admin interface listens on. |
+| `use_tls` | `true` | Serve built-in TLS. Required unless a proxy terminates TLS — see [Admin Server TLS](#admin-server-tls). |
+| `cert_path` / `key_path` | `gophish_admin.crt` / `.key` | TLS cert/key; self-signed on first run if absent. |
+| `trusted_origins` | `[]` | Extra browser-facing hosts (`host[:port]`) accepted by CSRF when behind a host-rewriting proxy. |
+| `trusted_proxies` | `[]` | CIDRs/IPs of proxies whose forwarded-for headers are trusted. See [Reverse proxies](#reverse-proxies-and-client-ips). |
+| `allowed_internal_hosts` | `[]` | Internal hosts server-side fetches (Import Site, webhooks) may reach; otherwise internal/loopback/metadata addresses are blocked. |
+| `oidc` | `null` | OpenID Connect SSO (below). |
+| `saml` | `null` | SAML 2.0 SSO (below). |
+| `directory` | `[]` | Directory connectors for group sync (below). See [Directory Sync](#directory-sync). |
+| `template_library` | `null` | Git-backed template catalog (below). |
+
+**`phish_server`** — `listen_url` (default `0.0.0.0:80`), `use_tls`, `cert_path`, `key_path`, and `trusted_proxies` (same meaning as the admin server).
+
+**Enabling the optional blocks** — paste into `admin_server` and fill in:
+
+```jsonc
+// MySQL (top level, not under admin_server):
+"db_name": "mysql",
+"db_path": "gophish:password@(127.0.0.1:3306)/gophish?charset=utf8&parseTime=True&loc=UTC",
+
+// OIDC SSO:
+"oidc": {
+    "issuer": "https://login.example.com",
+    "client_id": "...", "client_secret": "...",
+    "redirect_url": "https://gophish.example.com:3333/login/oidc/callback",
+    "auto_create_users": true, "default_role": "user",
+    "allowed_domains": ["example.com"]
+},
+
+// SAML SSO:
+"saml": {
+    "idp_metadata_url": "https://idp.example.com/metadata",
+    "root_url": "https://gophish.example.com:3333",
+    "auto_create_users": true, "default_role": "user"
+},
+
+// Directory connector (one per entry), e.g. Microsoft Entra:
+"directory": [
+    { "name": "entra", "provider": "msgraph",
+      "tenant_id": "...", "client_id": "...", "client_secret": "..." }
+],
+
+// Template library:
+"template_library": {
+    "url": "https://github.com/acme/phishing-templates.git",
+    "branch": "main"
+}
+```
+
+The full field set for each block (all OIDC/SAML/directory/template-library options, with defaults) is documented in [`config/config.go`](config/config.go). Note: sending through **Microsoft Graph or Gmail** is configured per sending profile in the admin UI, not in `config.json` — see [Sending through Microsoft Graph or Gmail](#sending-through-microsoft-graph-or-gmail).
 
 ### Teams
 

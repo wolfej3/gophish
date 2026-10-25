@@ -1,0 +1,39 @@
+# Optional overlay: put a Caddy reverse proxy in front of the admin server so
+# browsers get real TLS instead of gophish's self-signed certificate. Caddy
+# terminates HTTPS and forwards to the admin server over the internal network,
+# so gophish itself runs with admin TLS turned off.
+#
+# Local use (Caddy's local CA, reachable at https://localhost):
+#   docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d --build
+#
+# Public domain (automatic Let's Encrypt): set CADDY_SITE_ADDRESS to your
+# hostname in .env and remove the "tls internal" line from the Caddyfile.
+
+services:
+  gophish:
+    environment:
+      # Admin TLS is terminated by Caddy now, not gophish.
+      ADMIN_USE_TLS: "false"
+      # Trust Caddy's forwarded-for headers (Docker's default bridge subnets).
+      ADMIN_TRUSTED_PROXIES: "172.16.0.0/12"
+      # The browser-facing hostname, so CSRF accepts logins proxied to it.
+      ADMIN_TRUSTED_ORIGINS: ${CADDY_SITE_ADDRESS:-localhost}
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - gophish
+    environment:
+      CADDY_SITE_ADDRESS: ${CADDY_SITE_ADDRESS:-localhost}
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

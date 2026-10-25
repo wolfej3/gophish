@@ -1,0 +1,12 @@
+# Caddy config for the docker-compose.proxy.yml overlay. Caddy terminates TLS
+# and reverse-proxies the admin server, which runs with admin TLS off.
+#
+# CADDY_SITE_ADDRESS defaults to "localhost" (Caddy serves it with its local
+# CA). For a public domain, set CADDY_SITE_ADDRESS to the hostname in .env and
+# delete the "tls internal" line so Caddy obtains a real certificate
+# automatically.
+
+{$CADDY_SITE_ADDRESS:localhost} {
+	reverse_proxy gophish:3333
+	tls internal
+}
