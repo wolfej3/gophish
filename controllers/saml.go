@@ -237,15 +237,6 @@ func (c *samlClient) loadMetadataLocked(ctx context.Context) (*saml.ServiceProvi
 	return c.ready, nil
 }
 
-// refreshServiceProvider forces the identity provider's metadata to be
-// reloaded, for when an assertion fails to validate because the provider
-// rotated its signing certificate.
-func (c *samlClient) refreshServiceProvider(ctx context.Context) (*saml.ServiceProvider, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.loadMetadataLocked(ctx)
-}
-
 // maxSAMLMetadataSize limits how much metadata we read from the identity
 // provider.
 const maxSAMLMetadataSize = 10 << 20
@@ -391,16 +382,6 @@ func (as *AdminServer) SAMLACS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	assertion, err := sp.ParseResponse(r, []string{tracking.RequestID})
-	if err != nil {
-		// The identity provider may have rotated its signing certificate since
-		// we cached its metadata. Refresh the metadata once and retry before
-		// giving up, so a rotation doesn't require restarting Gophish.
-		if refreshed, rerr := as.saml.refreshServiceProvider(reqCtx); rerr == nil {
-			if a, aerr := refreshed.ParseResponse(r, []string{tracking.RequestID}); aerr == nil {
-				assertion, err = a, nil
-			}
-		}
-	}
 	if err != nil {
 		var invalid *saml.InvalidResponseError
 		if errors.As(err, &invalid) {
