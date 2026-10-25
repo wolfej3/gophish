@@ -12,12 +12,18 @@ var ErrModifyingOnlyAdmin = errors.New("Cannot remove the only administrator")
 
 // User represents the user model for gophish.
 type User struct {
-	Id                     int64     `json:"id"`
-	Username               string    `json:"username" gorm:"not null;unique"`
-	Hash                   string    `json:"-"`
-	ApiKey                 string    `json:"api_key" gorm:"not null;unique"`
-	Role                   Role      `json:"role"`
-	RoleID                 int64     `json:"-"`
+	Id       int64  `json:"id"`
+	Username string `json:"username" gorm:"not null;unique"`
+	Hash     string `json:"-"`
+	ApiKey   string `json:"api_key" gorm:"not null;unique"`
+	Role     Role   `json:"role"`
+	RoleID   int64  `json:"-"`
+	// TenantId is the tenant the user belongs to. Every user belongs to exactly
+	// one tenant; provider admins act across all of them.
+	TenantId int64 `json:"tenant_id" gorm:"column:tenant_id"`
+	// DefaultTeamId is the team the user lands in when they don't ask for a
+	// specific one. 0 falls back to their first available team.
+	DefaultTeamId          int64     `json:"default_team_id" gorm:"column:default_team_id"`
 	PasswordChangeRequired bool      `json:"password_change_required"`
 	AccountLocked          bool      `json:"account_locked"`
 	LastLogin              time.Time `json:"last_login"`
@@ -69,6 +75,14 @@ func GetUser(id int64) (User, error) {
 func GetUsers() ([]User, error) {
 	us := []User{}
 	err := db.Preload("Role").Find(&us).Error
+	return us, err
+}
+
+// GetUsersByTenant returns the users that belong to the given tenant. Tenant
+// admins see only their own tenant's users; provider admins use GetUsers.
+func GetUsersByTenant(tid int64) ([]User, error) {
+	us := []User{}
+	err := db.Preload("Role").Where("tenant_id = ?", tid).Find(&us).Error
 	return us, err
 }
 
@@ -126,6 +140,30 @@ func EnsureEnoughAdmins() error {
 	return nil
 }
 
+// ErrModifyingOnlyProviderAdmin occurs when there is an attempt to remove or
+// demote the only provider admin, which would leave no one able to manage
+// tenants.
+var ErrModifyingOnlyProviderAdmin = errors.New("Cannot remove the only provider administrator")
+
+// EnsureEnoughProviderAdmins ensures that more than one user account has the
+// provider admin role. It's meant to be called before deleting or demoting a
+// provider admin.
+func EnsureEnoughProviderAdmins() error {
+	role, err := GetRoleBySlug(RoleProviderAdmin)
+	if err != nil {
+		return err
+	}
+	var count int64
+	err = db.Model(&User{}).Where("role_id=?", role.ID).Count(&count).Error
+	if err != nil {
+		return err
+	}
+	if count == 1 {
+		return ErrModifyingOnlyProviderAdmin
+	}
+	return nil
+}
+
 // DeleteUser deletes the given user. To ensure that there is always at least
 // one user account with the Admin role, this function will refuse to delete
 // the last Admin. Objects the user created stay with their teams.
@@ -134,15 +172,25 @@ func DeleteUser(id int64) error {
 	if err != nil {
 		return err
 	}
-	// If the user is an admin, we need to verify that it's not the last one.
-	if existing.Role.Slug == RoleAdmin {
-		err = EnsureEnoughAdmins()
-		if err != nil {
+	// We can't remove the last account that keeps a privileged role.
+	switch existing.Role.Slug {
+	case RoleProviderAdmin:
+		if err = EnsureEnoughProviderAdmins(); err != nil {
+			return err
+		}
+	case RoleAdmin:
+		if err = EnsureEnoughAdmins(); err != nil {
 			return err
 		}
 	}
-	// The user's campaigns, templates, and other objects belong to their
-	// teams, so they stay for the rest of the team. Only the user's own
+	// The user's personal team is private to them, so it goes with the user
+	// (refusing if it still holds objects). This runs first so nothing is
+	// half-deleted if the personal team isn't empty.
+	if err = DeletePersonalTeam(id); err != nil {
+		return err
+	}
+	// The user's shared-team campaigns, templates, and other objects belong to
+	// their teams, so they stay for the rest of the team. Only the user's own
 	// memberships go.
 	err = db.Where("user_id=?", id).Delete(&TeamMember{}).Error
 	if err != nil {

@@ -2,6 +2,12 @@
 <div class="container-fluid">
     <div class="row">
         <div class="col-sm-3 col-md-2 sidebar">
+            {{if .ManageTenants}}
+            <div id="tenantSwitcherGroup" class="form-group hidden" style="padding: 10px 15px 0;">
+                <label for="tenantSwitcher" class="control-label" style="font-size: 11px; text-transform: uppercase; color: #777;">Tenant</label>
+                <select id="tenantSwitcher" class="form-control input-sm"></select>
+            </div>
+            {{end}}
             <div id="teamSwitcherGroup" class="form-group hidden" style="padding: 10px 15px 0;">
                 <label for="teamSwitcher" class="control-label" style="font-size: 11px; text-transform: uppercase; color: #777;">Team</label>
                 <select id="teamSwitcher" class="form-control input-sm"></select>
@@ -36,6 +42,11 @@
                 <li>
                     <a href="/settings">Account Settings</span></a>
                 </li>
+                {{if .ManageTenants}}
+                <li>
+                    <a href="/tenants">Tenants<span class="nav-badge badge pull-right">Provider</span></a>
+                </li>
+                {{end}}
                 {{if .ModifySystem}}
                 <li>
                     <a href="/users">User Management<span class="nav-badge badge pull-right">Admin</span></a>

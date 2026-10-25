@@ -34,6 +34,29 @@ $(document).ready(function () {
                 errorFlash(data.responseJSON.message)
             })
     })
+    // Populate the default-team selector with the teams the user can use.
+    api.teams.get()
+        .success(function (teams) {
+            teams = (teams || []).filter(function (t) {
+                return !t.owner_user_id || (window.user && t.owner_user_id === window.user.id)
+            })
+            if (teams.length === 0) {
+                return
+            }
+            var $select = $("#defaultTeamSelect").empty()
+            var current = (window.user && window.user.default_team_id) || 0
+            $.each(teams, function (i, t) {
+                var label = (t.owner_user_id && window.user && t.owner_user_id === window.user.id) ? "Personal" : t.name
+                $select.append($("<option>").val(t.id).text(label).prop("selected", t.id === current))
+            })
+            $("#defaultTeamGroup").show()
+        })
+    $("#defaultTeamSelect").change(function () {
+        $.post("/settings/default_team", { default_team_id: $(this).val(), csrf_token: csrf_token })
+            .done(function () { successFlash("Default team updated") })
+            .fail(function (data) { errorFlash(data.responseJSON ? data.responseJSON.message : "Error updating default team") })
+    })
+
     $("#settingsForm").submit(function (e) {
         $.post("/settings", $(this).serialize())
             .done(function (data) {

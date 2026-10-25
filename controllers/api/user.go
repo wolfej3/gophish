@@ -42,6 +42,12 @@ type userRequest struct {
 	// identities (OIDC and SAML), so that the next identity to sign in with
 	// their username is linked instead.
 	UnlinkOIDC bool `json:"unlink_oidc"`
+	// TenantId is the tenant to place the user in. Only a provider admin may
+	// set it; for a tenant admin a new user always joins their own tenant.
+	TenantId int64 `json:"tenant_id"`
+	// DefaultTeamId is the team the user lands in by default. It must be a team
+	// the user can access.
+	DefaultTeamId int64 `json:"default_team_id"`
 }
 
 func (ur *userRequest) Validate(existingUser *models.User) error {
@@ -76,7 +82,16 @@ func (ur *userRequest) Validate(existingUser *models.User) error {
 func (as *Server) Users(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == "GET":
-		us, err := models.GetUsers()
+		// A provider admin sees every user; a tenant admin sees only their own
+		// tenant's users.
+		var us []models.User
+		var err error
+		if isProviderAdmin(r) {
+			us, err = models.GetUsers()
+		} else {
+			currentUser := ctx.Get(r, "user").(models.User)
+			us, err = models.GetUsersByTenant(currentUser.TenantId)
+		}
 		if err != nil {
 			JSONResponse(w, models.Response{Success: false, Message: err.Error()}, http.StatusInternalServerError)
 			return
@@ -113,17 +128,40 @@ func (as *Server) Users(w http.ResponseWriter, r *http.Request) {
 			JSONResponse(w, models.Response{Success: false, Message: err.Error()}, http.StatusInternalServerError)
 			return
 		}
+		// Only a provider admin may create another provider admin.
+		if role.Slug == models.RoleProviderAdmin && !isProviderAdmin(r) {
+			JSONResponse(w, models.Response{Success: false, Message: ErrInsufficientPermission.Error()}, http.StatusForbidden)
+			return
+		}
+		// A tenant admin's new users join their own tenant; a provider admin may
+		// place a user in any tenant.
+		currentUser := ctx.Get(r, "user").(models.User)
+		tenantID := currentUser.TenantId
+		if isProviderAdmin(r) && ur.TenantId != 0 {
+			tenantID = ur.TenantId
+		}
+		if _, err := models.GetTenant(tenantID); err != nil {
+			JSONResponse(w, models.Response{Success: false, Message: "Invalid tenant"}, http.StatusBadRequest)
+			return
+		}
 		user := models.User{
 			Username:               ur.Username,
 			Hash:                   hash,
 			ApiKey:                 auth.GenerateSecureKey(auth.APIKeyLength),
 			Role:                   role,
 			RoleID:                 role.ID,
+			TenantId:               tenantID,
 			PasswordChangeRequired: ur.PasswordChangeRequired,
 			AccountLocked:          ur.AccountLocked,
 		}
 		err = models.PutUser(&user)
 		if err != nil {
+			JSONResponse(w, models.Response{Success: false, Message: err.Error()}, http.StatusInternalServerError)
+			return
+		}
+		// Give the new user a private personal team. Their default team is left
+		// unset until they (or an admin) choose one.
+		if _, err := models.EnsurePersonalTeam(user); err != nil {
 			JSONResponse(w, models.Response{Success: false, Message: err.Error()}, http.StatusInternalServerError)
 			return
 		}
@@ -152,6 +190,12 @@ func (as *Server) User(w http.ResponseWriter, r *http.Request) {
 	}
 	existingUser, err := models.GetUser(id)
 	if err != nil {
+		JSONResponse(w, models.Response{Success: false, Message: "User not found"}, http.StatusNotFound)
+		return
+	}
+	// A tenant admin can only act on users within their own tenant. (A user
+	// acting on their own account is always allowed.)
+	if hasSystem && !isProviderAdmin(r) && existingUser.TenantId != currentUser.TenantId {
 		JSONResponse(w, models.Response{Success: false, Message: "User not found"}, http.StatusNotFound)
 		return
 	}
@@ -196,8 +240,20 @@ func (as *Server) User(w http.ResponseWriter, r *http.Request) {
 			JSONResponse(w, models.Response{Success: false, Message: err.Error()}, http.StatusInternalServerError)
 			return
 		}
+		// Only a provider admin can grant or revoke the provider_admin role.
+		if (role.Slug == models.RoleProviderAdmin || existingUser.Role.Slug == models.RoleProviderAdmin) && !isProviderAdmin(r) {
+			JSONResponse(w, models.Response{Success: false, Message: ErrInsufficientPermission.Error()}, http.StatusForbidden)
+			return
+		}
 		// If our user is trying to change the role of an admin, we need to
-		// ensure that it isn't the last user account with the Admin role.
+		// ensure that it isn't the last user account with that privileged role.
+		if existingUser.Role.Slug == models.RoleProviderAdmin && existingUser.Role.ID != role.ID {
+			err = models.EnsureEnoughProviderAdmins()
+			if err != nil {
+				JSONResponse(w, models.Response{Success: false, Message: err.Error()}, http.StatusInternalServerError)
+				return
+			}
+		}
 		if existingUser.Role.Slug == models.RoleAdmin && existingUser.Role.ID != role.ID {
 			err = models.EnsureEnoughAdmins()
 			if err != nil {
@@ -243,6 +299,26 @@ func (as *Server) User(w http.ResponseWriter, r *http.Request) {
 			existingUser.OIDCIdentity = ""
 			existingUser.SAMLIdentity = ""
 			mid.AuditUser(r, models.AuditSSOUnlinked, existingUser.Username, "unlinked by an admin")
+		}
+		// A default team can be set, but only to a team the user can access.
+		if ur.DefaultTeamId != 0 && ur.DefaultTeamId != existingUser.DefaultTeamId {
+			teams, terr := models.GetUserTeams(existingUser)
+			if terr != nil {
+				JSONResponse(w, models.Response{Success: false, Message: terr.Error()}, http.StatusInternalServerError)
+				return
+			}
+			allowed := false
+			for _, t := range teams {
+				if t.Id == ur.DefaultTeamId {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				JSONResponse(w, models.Response{Success: false, Message: "Default team must be a team the user can access"}, http.StatusBadRequest)
+				return
+			}
+			existingUser.DefaultTeamId = ur.DefaultTeamId
 		}
 		err = models.PutUser(&existingUser)
 		if err != nil {

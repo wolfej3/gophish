@@ -19,11 +19,15 @@ func userInTeam(t *testing.T, username, role string) (*models.User, models.Team)
 	if err != nil {
 		t.Fatalf("error getting role: %v", err)
 	}
-	u := &models.User{Username: username, Hash: "x", ApiKey: username + "-key", Role: userRole, RoleID: userRole.ID}
+	def, err := models.GetDefaultTenant()
+	if err != nil {
+		t.Fatalf("error getting default tenant: %v", err)
+	}
+	u := &models.User{Username: username, Hash: "x", ApiKey: username + "-key", Role: userRole, RoleID: userRole.ID, TenantId: def.Id}
 	if err := models.PutUser(u); err != nil {
 		t.Fatalf("error creating user: %v", err)
 	}
-	team := models.Team{Name: username + "-team"}
+	team := models.Team{Name: username + "-team", TenantId: def.Id}
 	if err := models.PostTeam(&team); err != nil {
 		t.Fatalf("error creating team: %v", err)
 	}
@@ -119,8 +123,9 @@ func TestTeamHeaderSelectsTeam(t *testing.T) {
 	testCtx := setupTest(t)
 	// Admin is on every team; create two teams with a group each
 	admin, _ := models.GetUser(1)
-	teamA := models.Team{Name: "A"}
-	teamB := models.Team{Name: "B"}
+	def, _ := models.GetDefaultTenant()
+	teamA := models.Team{Name: "A", TenantId: def.Id}
+	teamB := models.Team{Name: "B", TenantId: def.Id}
 	models.PostTeam(&teamA)
 	models.PostTeam(&teamB)
 	for _, tc := range []struct {

@@ -26,8 +26,9 @@ func TestScopedKeyCannotChangeUserPassword(t *testing.T) {
 		t.Fatalf("expected a scoped key to be forbidden from creating users, got %d", w.Code)
 	}
 
-	// The full key can still manage users.
-	if w := apiRequest(t, testCtx, http.MethodPut, "/api/users/1", testCtx.apiKey, userRequest{Username: "admin", Role: models.RoleAdmin, Password: "newadminpass"}); w.Code != http.StatusOK {
+	// The full key can still manage users. User 1 is the provider admin, so we
+	// keep that role rather than demoting the only provider admin.
+	if w := apiRequest(t, testCtx, http.MethodPut, "/api/users/1", testCtx.apiKey, userRequest{Username: "admin", Role: models.RoleProviderAdmin, Password: "newadminpass"}); w.Code != http.StatusOK {
 		t.Fatalf("expected the full key to change the password, got %d %s", w.Code, w.Body.String())
 	}
 }

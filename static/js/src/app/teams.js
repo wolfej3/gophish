@@ -1,12 +1,14 @@
 let teams = []
 let allUsers = []
+let tenantsById = {}
 let editingId = -1
 let membersTeamId = -1
+const isProvider = !!(window.user && window.user.manage_tenants)
 
 const loadTeams = () => {
     $("#teamTable").hide()
     $("#loading").show()
-    api.teams.get()
+    api.teams.shared()
         .success((ts) => {
             teams = ts
             $("#loading").hide()
@@ -15,6 +17,10 @@ const loadTeams = () => {
             $.each(teams, (i, team) => {
                 const row = $("<tr>")
                 row.append($("<td>").text(team.name))
+                if (isProvider) {
+                    const tenant = tenantsById[team.tenant_id]
+                    row.append($("<td class='tenant-col'>").text(tenant ? tenant.name : "—"))
+                }
                 row.append($("<td>").append($("<button class='btn btn-default btn-sm members-button'>")
                     .attr("data-team-id", team.id)
                     .html("<i class='fa fa-users'></i> Members")))
@@ -32,7 +38,11 @@ const loadTeams = () => {
 const saveTeam = () => {
     const name = $("#name").val()
     if (editingId === -1) {
-        api.teams.post({ name: name })
+        const team = { name: name }
+        if (isProvider) {
+            team.tenant_id = parseInt($("#tenantSelect").val(), 10) || 0
+        }
+        api.teams.post(team)
             .success(() => { successFlash("Team created"); $("#modal").modal("hide"); loadTeams() })
             .error((data) => modalError(data.responseJSON.message))
     } else {
@@ -48,10 +58,13 @@ const editTeam = (id) => {
     if (id === -1) {
         $("#teamModalLabel").text("New Team")
         $("#name").val("")
+        // A team's tenant is only chosen at creation, and only by a provider.
+        $("#tenantSelectGroup").toggle(isProvider)
     } else {
         const team = teams.find((t) => t.id === id)
         $("#teamModalLabel").text("Edit Team")
         $("#name").val(team ? team.name : "")
+        $("#tenantSelectGroup").hide()
     }
     $("#modal").modal("show")
 }
@@ -133,7 +146,22 @@ $(document).ready(function () {
     api.users.get()
         .success((us) => { allUsers = us })
         .error(() => {})
-    loadTeams()
+    // Provider admins see a Tenant column and pick a tenant when creating a team.
+    if (isProvider) {
+        $(".tenant-col").show()
+        api.tenants.get()
+            .success((ts) => {
+                const select = $("#tenantSelect").empty()
+                $.each(ts, (i, t) => {
+                    tenantsById[t.id] = t
+                    select.append($("<option>").val(t.id).text(t.name))
+                })
+                loadTeams()
+            })
+            .error(() => loadTeams())
+    } else {
+        loadTeams()
+    }
     $("#new_button").click(() => editTeam(-1))
     $("#modalSubmit").click(saveTeam)
     $("#teamTable").on("click", ".edit-button", function () { editTeam(parseInt($(this).attr("data-team-id"), 10)) })

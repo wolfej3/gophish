@@ -52,6 +52,10 @@ function query(endpoint, method, data, async) {
             if (teamId) {
                 xhr.setRequestHeader('X-Gophish-Team-Id', teamId);
             }
+            var tenantId = getCurrentTenantId();
+            if (tenantId) {
+                xhr.setRequestHeader('X-Gophish-Tenant-Id', tenantId);
+            }
         }
     })
 }
@@ -308,8 +312,27 @@ var api = {
         get: function () {
             return query("/teams/", "GET", {}, false)
         },
+        shared: function () {
+            return query("/teams/?scope=shared", "GET", {}, false)
+        },
         post: function (team) {
             return query("/teams/", "POST", team, false)
+        },
+    },
+    tenants: {
+        get: function () {
+            return query("/tenants/", "GET", {}, false)
+        },
+        post: function (tenant) {
+            return query("/tenants/", "POST", tenant, false)
+        },
+    },
+    tenantId: {
+        put: function (tenant) {
+            return query("/tenants/" + tenant.id, "PUT", tenant, false)
+        },
+        delete: function (id) {
+            return query("/tenants/" + id, "DELETE", {}, false)
         },
     },
     teamId: {
@@ -427,8 +450,19 @@ function getCurrentTeamId() {
 }
 window.getCurrentTeamId = getCurrentTeamId
 
+// teamLabel returns the label to show for a team in the switcher. The current
+// user's own personal team reads as "Personal"; shared teams use their name.
+function teamLabel(team) {
+    if (team.owner_user_id && window.user && team.owner_user_id === window.user.id) {
+        return "Personal"
+    }
+    return team.name
+}
+
 // setupTeamSwitcher fills the team dropdown in the sidebar and reloads the
-// page when a different team is chosen, so every table reflects it.
+// page when a different team is chosen, so every table reflects it. It hides
+// other users' personal teams, which admins can see but shouldn't have to
+// scroll past here.
 function setupTeamSwitcher() {
     var $switcher = $("#teamSwitcher")
     if (!$switcher.length) {
@@ -436,8 +470,11 @@ function setupTeamSwitcher() {
     }
     api.teams.get()
         .success(function (teams) {
+            teams = (teams || []).filter(function (team) {
+                return !team.owner_user_id || (window.user && team.owner_user_id === window.user.id)
+            })
             // With one team there's nothing to switch, so hide the control.
-            if (!teams || teams.length <= 1) {
+            if (teams.length <= 1) {
                 $("#teamSwitcherGroup").addClass("hidden")
                 return
             }
@@ -449,7 +486,7 @@ function setupTeamSwitcher() {
                 if (selected) {
                     stillAMember = true
                 }
-                $switcher.append($("<option>").val(team.id).text(team.name).prop("selected", selected))
+                $switcher.append($("<option>").val(team.id).text(teamLabel(team)).prop("selected", selected))
             })
             // If the remembered team is gone, fall back to the first one.
             if (!stillAMember) {
@@ -469,6 +506,48 @@ function setupTeamSwitcher() {
 }
 window.setupTeamSwitcher = setupTeamSwitcher
 
+// getCurrentTenantId returns the tenant a provider admin has scoped the UI to,
+// remembered per browser. Empty means "my own tenant".
+function getCurrentTenantId() {
+    try {
+        return localStorage.getItem("gophish.tenantId") || ""
+    } catch (e) {
+        return ""
+    }
+}
+window.getCurrentTenantId = getCurrentTenantId
+
+// setupTenantSwitcher fills the tenant dropdown (provider admins only) and
+// reloads the page when a different tenant is chosen, scoping team and user
+// lists to it.
+function setupTenantSwitcher() {
+    var $switcher = $("#tenantSwitcher")
+    if (!$switcher.length) {
+        return
+    }
+    api.tenants.get()
+        .success(function (tenants) {
+            if (!tenants || tenants.length === 0) {
+                $("#tenantSwitcherGroup").addClass("hidden")
+                return
+            }
+            var current = getCurrentTenantId()
+            $switcher.empty()
+            $switcher.append($("<option>").val("").text("All tenants").prop("selected", current === ""))
+            $.each(tenants, function (i, tenant) {
+                $switcher.append($("<option>").val(tenant.id).text(tenant.name).prop("selected", String(tenant.id) === current))
+            })
+            $("#tenantSwitcherGroup").removeClass("hidden")
+        })
+    $switcher.off("change").on("change", function () {
+        try {
+            localStorage.setItem("gophish.tenantId", $(this).val())
+        } catch (e) {}
+        location.reload()
+    })
+}
+window.setupTenantSwitcher = setupTenantSwitcher
+
 // Register our moment.js datatables listeners
 $(document).ready(function () {
     // Setup nav highlighting
@@ -481,6 +560,7 @@ $(document).ready(function () {
         }
     })
     setupTeamSwitcher();
+    setupTenantSwitcher();
     $.fn.dataTable.moment('MMMM Do YYYY, h:mm:ss a');
     // Setup tooltips
     $('[data-toggle="tooltip"]').tooltip()

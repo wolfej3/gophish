@@ -81,7 +81,7 @@ func (s *ModelsSuite) TestGetPeopleAggregates(ch *check.C) {
 }
 
 func (s *ModelsSuite) TestPeopleScopedByTeam(ch *check.C) {
-	other := Team{Name: "Other"}
+	other := Team{Name: "Other", TenantId: s.defaultTenantID(ch)}
 	ch.Assert(PostTeam(&other), check.Equals, nil)
 	c1 := s.seedCampaign(ch, "Mine", 1)
 	c2 := s.seedCampaign(ch, "Theirs", other.Id)

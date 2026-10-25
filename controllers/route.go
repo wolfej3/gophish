@@ -7,6 +7,7 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -190,8 +191,10 @@ func (as *AdminServer) registerRoutes() {
 	router.HandleFunc("/settings/2fa/disable", mid.Use(as.DisableTOTP, as.limiter.Limit, mid.RequireLogin))
 	router.HandleFunc("/settings/2fa/recovery_codes", mid.Use(as.RegenerateRecoveryCodes, as.limiter.Limit, mid.RequireLogin))
 	router.HandleFunc("/settings/api_key/reveal", mid.Use(as.APIKeyReveal, as.limiter.Limit, mid.RequireLogin))
+	router.HandleFunc("/settings/default_team", mid.Use(as.SetDefaultTeam, mid.RequireLogin))
 	router.HandleFunc("/users", mid.Use(as.UserManagement, mid.RequirePermission(models.PermissionModifySystem), mid.RequireLogin))
 	router.HandleFunc("/teams", mid.Use(as.TeamManagement, mid.RequirePermission(models.PermissionModifySystem), mid.RequireLogin))
+	router.HandleFunc("/tenants", mid.Use(as.TenantManagement, mid.RequirePermission(models.PermissionManageTenants), mid.RequireLogin))
 	router.HandleFunc("/webhooks", mid.Use(as.Webhooks, mid.RequirePermission(models.PermissionModifySystem), mid.RequireLogin))
 	router.HandleFunc("/audit_log", mid.Use(as.AuditLog, mid.RequirePermission(models.PermissionModifySystem), mid.RequireLogin))
 	router.HandleFunc("/impersonate", mid.Use(as.Impersonate, mid.RequirePermission(models.PermissionModifySystem), mid.RequireLogin))
@@ -239,12 +242,13 @@ func (as *AdminServer) registerRoutes() {
 }
 
 type templateParams struct {
-	Title        string
-	Flashes      []interface{}
-	User         models.User
-	Token        string
-	Version      string
-	ModifySystem bool
+	Title         string
+	Flashes       []interface{}
+	User          models.User
+	Token         string
+	Version       string
+	ModifySystem  bool
+	ManageTenants bool
 }
 
 // newTemplateParams returns the default template parameters for a user and
@@ -253,12 +257,14 @@ func newTemplateParams(r *http.Request) templateParams {
 	user := ctx.Get(r, "user").(models.User)
 	session := ctx.Get(r, "session").(*sessions.Session)
 	modifySystem, _ := user.HasPermission(models.PermissionModifySystem)
+	manageTenants, _ := user.HasPermission(models.PermissionManageTenants)
 	return templateParams{
-		Token:        csrf.Token(r),
-		User:         user,
-		ModifySystem: modifySystem,
-		Version:      config.Version,
-		Flashes:      session.Flashes(),
+		Token:         csrf.Token(r),
+		User:          user,
+		ModifySystem:  modifySystem,
+		ManageTenants: manageTenants,
+		Version:       config.Version,
+		Flashes:       session.Flashes(),
 	}
 }
 
@@ -379,6 +385,37 @@ func (as *AdminServer) Settings(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// SetDefaultTeam lets a user choose which of their teams they land in by
+// default. It only accepts a team the user can actually access.
+func (as *AdminServer) SetDefaultTeam(w http.ResponseWriter, r *http.Request) {
+	u := ctx.Get(r, "user").(models.User)
+	tid, _ := strconv.ParseInt(r.FormValue("default_team_id"), 10, 64)
+	if tid != 0 {
+		teams, err := models.GetUserTeams(u)
+		if err != nil {
+			api.JSONResponse(w, models.Response{Success: false, Message: err.Error()}, http.StatusInternalServerError)
+			return
+		}
+		allowed := false
+		for _, t := range teams {
+			if t.Id == tid {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			api.JSONResponse(w, models.Response{Success: false, Message: "You can't set a default team you don't have access to"}, http.StatusBadRequest)
+			return
+		}
+	}
+	u.DefaultTeamId = tid
+	if err := models.PutUser(&u); err != nil {
+		api.JSONResponse(w, models.Response{Success: false, Message: err.Error()}, http.StatusInternalServerError)
+		return
+	}
+	api.JSONResponse(w, models.Response{Success: true, Message: "Default team updated"}, http.StatusOK)
+}
+
 // UserManagement is an admin-only handler that allows for the registration
 // and management of user accounts within Gophish.
 func (as *AdminServer) UserManagement(w http.ResponseWriter, r *http.Request) {
@@ -461,6 +498,13 @@ func (as *AdminServer) TeamManagement(w http.ResponseWriter, r *http.Request) {
 	params := newTemplateParams(r)
 	params.Title = "Teams"
 	getTemplate(w, "teams").ExecuteTemplate(w, "base", params)
+}
+
+// TenantManagement is a provider-admin-only handler for managing tenants
+func (as *AdminServer) TenantManagement(w http.ResponseWriter, r *http.Request) {
+	params := newTemplateParams(r)
+	params.Title = "Tenants"
+	getTemplate(w, "tenants").ExecuteTemplate(w, "base", params)
 }
 
 // AuditLog is an admin-only handler that shows the audit log

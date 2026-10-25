@@ -71,35 +71,22 @@ func (s *ModelsSuite) verifyRoleCount(c *check.C, roleID, expected int64) {
 }
 
 func (s *ModelsSuite) TestDeleteLastAdmin(c *check.C) {
-	// Create a new admin user
 	role, err := GetRoleBySlug(RoleAdmin)
 	c.Assert(err, check.Equals, nil)
-	newAdmin := User{
-		Username: "new-admin",
-		Hash:     "123456",
-		ApiKey:   "123456",
-		Role:     role,
-		RoleID:   role.ID,
-	}
-	err = PutUser(&newAdmin)
-	c.Assert(err, check.Equals, nil)
+	// User 1 is the provider admin, so there are no tenant admins to start.
+	s.verifyRoleCount(c, role.ID, 0)
 
-	// Ensure that there are two admins
+	admin1 := User{Username: "admin-1", Hash: "123456", ApiKey: "key-admin-1", Role: role, RoleID: role.ID}
+	c.Assert(PutUser(&admin1), check.Equals, nil)
+	admin2 := User{Username: "admin-2", Hash: "123456", ApiKey: "key-admin-2", Role: role, RoleID: role.ID}
+	c.Assert(PutUser(&admin2), check.Equals, nil)
 	s.verifyRoleCount(c, role.ID, 2)
 
-	// Delete the newly created admin - this should work since we have more
-	// than one current admin.
-	err = DeleteUser(newAdmin.Id)
-	c.Assert(err, check.Equals, nil)
-
-	// Verify that we now have one admin
+	// Deleting one admin works since another remains.
+	c.Assert(DeleteUser(admin2.Id), check.Equals, nil)
 	s.verifyRoleCount(c, role.ID, 1)
 
-	// Try to delete the last admin - this should fail since we always want at
-	// least one admin active in Gophish.
-	err = DeleteUser(1)
-	c.Assert(err, check.Equals, ErrModifyingOnlyAdmin)
-
-	// Verify that the admin wasn't deleted
+	// Deleting the last admin is refused.
+	c.Assert(DeleteUser(admin1.Id), check.Equals, ErrModifyingOnlyAdmin)
 	s.verifyRoleCount(c, role.ID, 1)
 }

@@ -18,7 +18,10 @@
     <script>
         {{if .User}}
     var user = {
-        username : {{ .User.Username }}
+        id : {{ .User.Id }},
+        username : {{ .User.Username }},
+        default_team_id : {{ .User.DefaultTeamId }},
+        manage_tenants : {{ .ManageTenants }}
     }
     {{end}}
     {{if .Token}}

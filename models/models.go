@@ -199,20 +199,27 @@ func Setup(c *config.Config) error {
 		log.Error(err)
 		return err
 	}
-	// Create the admin user if it doesn't exist
+	// Create the admin user if it doesn't exist. The bootstrap admin is the
+	// provider admin: the hosting operator who spans every tenant.
 	var userCount int64
 	var adminUser User
 	db.Model(&User{}).Count(&userCount)
-	adminRole, err := GetRoleBySlug(RoleAdmin)
+	adminRole, err := GetRoleBySlug(RoleProviderAdmin)
 	if err != nil {
 		log.Error(err)
 		return err
 	}
 	if userCount == 0 {
+		tenant, err := GetDefaultTenant()
+		if err != nil {
+			log.Error(err)
+			return err
+		}
 		adminUser := User{
 			Username:               DefaultAdminUsername,
 			Role:                   adminRole,
 			RoleID:                 adminRole.ID,
+			TenantId:               tenant.Id,
 			PasswordChangeRequired: true,
 		}
 
@@ -234,6 +241,12 @@ func Setup(c *config.Config) error {
 		}
 		err = SetTeamMember(team.Id, adminUser.Id, TeamRoleEditor)
 		if err != nil {
+			log.Error(err)
+			return err
+		}
+		// Give the admin a private personal team. Their default team is left
+		// unset, so they land in the shared Default team until they choose one.
+		if _, err := EnsurePersonalTeam(adminUser); err != nil {
 			log.Error(err)
 			return err
 		}

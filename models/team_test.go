@@ -12,6 +12,13 @@ func (s *ModelsSuite) defaultTeamID(ch *check.C) int64 {
 	return t.Id
 }
 
+// defaultTenantID returns the Default tenant's ID, created at setup.
+func (s *ModelsSuite) defaultTenantID(ch *check.C) int64 {
+	t, err := GetDefaultTenant()
+	ch.Assert(err, check.Equals, nil)
+	return t.Id
+}
+
 func (s *ModelsSuite) TestDefaultTeamHasAdmin(ch *check.C) {
 	admin, err := GetUser(1)
 	ch.Assert(err, check.Equals, nil)
@@ -21,13 +28,15 @@ func (s *ModelsSuite) TestDefaultTeamHasAdmin(ch *check.C) {
 }
 
 func (s *ModelsSuite) TestTeamCreateValidation(ch *check.C) {
-	ch.Assert(PostTeam(&Team{Name: "  "}), check.Equals, ErrTeamName)
-	ch.Assert(PostTeam(&Team{Name: "Blue"}), check.Equals, nil)
-	ch.Assert(PostTeam(&Team{Name: "Blue"}), check.Equals, ErrTeamNameTaken)
+	tid := s.defaultTenantID(ch)
+	ch.Assert(PostTeam(&Team{Name: "  ", TenantId: tid}), check.Equals, ErrTeamName)
+	ch.Assert(PostTeam(&Team{Name: "Blue"}), check.Equals, ErrTeamTenant)
+	ch.Assert(PostTeam(&Team{Name: "Blue", TenantId: tid}), check.Equals, nil)
+	ch.Assert(PostTeam(&Team{Name: "Blue", TenantId: tid}), check.Equals, ErrTeamNameTaken)
 }
 
 func (s *ModelsSuite) TestTeamMembershipAndRole(ch *check.C) {
-	team := Team{Name: "Red"}
+	team := Team{Name: "Red", TenantId: s.defaultTenantID(ch)}
 	ch.Assert(PostTeam(&team), check.Equals, nil)
 	user := User{Username: "viewer@example.com", Hash: "x", ApiKey: "k-viewer"}
 	ch.Assert(PutUser(&user), check.Equals, nil)
@@ -56,7 +65,7 @@ func (s *ModelsSuite) TestTeamMembershipAndRole(ch *check.C) {
 }
 
 func (s *ModelsSuite) TestAdminSeesAllTeams(ch *check.C) {
-	ch.Assert(PostTeam(&Team{Name: "Green"}), check.Equals, nil)
+	ch.Assert(PostTeam(&Team{Name: "Green", TenantId: s.defaultTenantID(ch)}), check.Equals, nil)
 	admin, _ := GetUser(1)
 	teams, err := GetUserTeams(admin)
 	ch.Assert(err, check.Equals, nil)
@@ -73,7 +82,7 @@ func (s *ModelsSuite) TestAdminSeesAllTeams(ch *check.C) {
 
 func (s *ModelsSuite) TestObjectsScopedByTeam(ch *check.C) {
 	teamA := s.defaultTeamID(ch)
-	teamB := Team{Name: "Other"}
+	teamB := Team{Name: "Other", TenantId: s.defaultTenantID(ch)}
 	ch.Assert(PostTeam(&teamB), check.Equals, nil)
 
 	a := Group{Name: "A Group", TeamId: teamA, UserId: 1}
@@ -99,7 +108,7 @@ func (s *ModelsSuite) TestDeleteTeamRules(ch *check.C) {
 	// Can't delete the only team
 	ch.Assert(DeleteTeam(s.defaultTeamID(ch)), check.Equals, ErrLastTeam)
 
-	team := Team{Name: "Temp"}
+	team := Team{Name: "Temp", TenantId: s.defaultTenantID(ch)}
 	ch.Assert(PostTeam(&team), check.Equals, nil)
 	g := Group{Name: "Held", TeamId: team.Id, UserId: 1}
 	g.Targets = []Target{{BaseRecipient: BaseRecipient{Email: "h@example.com"}}}

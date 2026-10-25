@@ -15,6 +15,24 @@ func teamID(r *http.Request) int64 {
 	return id
 }
 
+// tenantID returns the tenant the request is scoped to, as resolved by the
+// RequireTeam middleware.
+func tenantID(r *http.Request) int64 {
+	id, _ := ctx.Get(r, "tenant_id").(int64)
+	return id
+}
+
+// isProviderAdmin reports whether the current user can manage tenants and act
+// across all of them.
+func isProviderAdmin(r *http.Request) bool {
+	u, ok := ctx.Get(r, "user").(models.User)
+	if !ok {
+		return false
+	}
+	ok, _ = u.HasPermission(models.PermissionManageTenants)
+	return ok
+}
+
 // userID returns the ID of the user making the request, used to record who
 // created or last changed an object.
 func userID(r *http.Request) int64 {

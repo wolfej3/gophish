@@ -9,16 +9,23 @@ import (
 	"github.com/gophish/gophish/models"
 )
 
-// Context keys holding the team a request acts in and the user's role on it.
+// Context keys holding the team a request acts in, the user's role on it, and
+// the tenant the request is scoped to.
 const (
 	TeamIDContextKey   = "team_id"
 	TeamRoleContextKey = "team_role"
+	TenantIDContextKey = "tenant_id"
 )
 
 // TeamIDHeader lets API clients choose which team a request acts in. The web
 // interface sends it from the team switcher. Without it, the request uses the
-// user's first team.
+// user's default team, then their first team.
 const TeamIDHeader = "X-Gophish-Team-Id"
+
+// TenantIDHeader lets a provider admin scope a request to one tenant (for
+// filtering the team and user lists). It's ignored for everyone else, whose
+// tenant is fixed to their own.
+const TenantIDHeader = "X-Gophish-Tenant-Id"
 
 // RequireTeam resolves which team the request acts in and stores it in the
 // context, then enforces team membership and role for requests to team
@@ -30,12 +37,23 @@ func RequireTeam(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		// Scope the request to a tenant. A provider admin may select one with
+		// the tenant header; everyone else is fixed to their own tenant.
+		tenantID := u.TenantId
+		if provider, _ := u.HasPermission(models.PermissionManageTenants); provider {
+			if rt := requestedTenantID(r); rt != 0 {
+				tenantID = rt
+			}
+		}
+		r = ctx.Set(r, TenantIDContextKey, tenantID)
+
 		teams, err := models.GetUserTeams(u)
 		if err != nil {
 			JSONError(w, http.StatusInternalServerError, "Error loading teams")
 			return
 		}
-		// Pick the requested team, or the user's first one
+		// Pick the requested team, then the user's default team, then their
+		// first one.
 		var current *models.TeamMembership
 		requested := requestedTeamID(r)
 		for i := range teams {
@@ -44,8 +62,18 @@ func RequireTeam(next http.Handler) http.Handler {
 				break
 			}
 		}
-		if current == nil && requested == 0 && len(teams) > 0 {
-			current = &teams[0]
+		if current == nil && requested == 0 {
+			if u.DefaultTeamId != 0 {
+				for i := range teams {
+					if teams[i].Id == u.DefaultTeamId {
+						current = &teams[i]
+						break
+					}
+				}
+			}
+			if current == nil && len(teams) > 0 {
+				current = &teams[0]
+			}
 		}
 
 		resource := apiResource(r)
@@ -86,6 +114,17 @@ func requestedTeamID(r *http.Request) int64 {
 	return id
 }
 
+// requestedTenantID returns the tenant ID the request asked for, from the
+// header or a tenant_id form value, or 0 if none.
+func requestedTenantID(r *http.Request) int64 {
+	raw := r.Header.Get(TenantIDHeader)
+	if raw == "" {
+		raw = r.Form.Get("tenant_id")
+	}
+	id, _ := strconv.ParseInt(raw, 10, 64)
+	return id
+}
+
 // apiResource returns the first path segment after /api/, which names the
 // resource being acted on.
 func apiResource(r *http.Request) string {
@@ -105,5 +144,12 @@ func isWrite(r *http.Request) bool {
 // TeamID returns the team the request acts in, or 0 if none was resolved.
 func TeamID(r *http.Request) int64 {
 	id, _ := ctx.Get(r, TeamIDContextKey).(int64)
+	return id
+}
+
+// TenantID returns the tenant the request is scoped to, or 0 if none was
+// resolved.
+func TenantID(r *http.Request) int64 {
+	id, _ := ctx.Get(r, TenantIDContextKey).(int64)
 	return id
 }

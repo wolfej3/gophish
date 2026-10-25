@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -36,12 +37,28 @@ var ErrTeamNotEmpty = errors.New("Move or delete the team's campaigns, templates
 // ErrLastTeam is returned when deleting the only team.
 var ErrLastTeam = errors.New("Cannot delete the only team")
 
+// ErrTeamTenant is returned when a team isn't assigned to a valid tenant.
+var ErrTeamTenant = errors.New("A valid tenant is required")
+
+// ErrPersonalTeam is returned when an operation isn't allowed on a user's
+// personal team (such as managing its members or deleting it directly).
+var ErrPersonalTeam = errors.New("A personal team can't be modified this way")
+
 // Team is a group of users who share campaigns, templates, landing pages,
-// groups, and sending profiles.
+// groups, and sending profiles. Every team belongs to a tenant. A team with a
+// non-zero OwnerUserId is that user's private "personal" team, used for solo
+// work that teammates can't see.
 type Team struct {
-	Id        int64     `json:"id"`
-	Name      string    `json:"name"`
-	CreatedAt time.Time `json:"created_at"`
+	Id          int64     `json:"id"`
+	Name        string    `json:"name"`
+	CreatedAt   time.Time `json:"created_at"`
+	TenantId    int64     `json:"tenant_id" gorm:"column:tenant_id"`
+	OwnerUserId int64     `json:"owner_user_id" gorm:"column:owner_user_id"`
+}
+
+// IsPersonal reports whether the team is a user's private personal team.
+func (t Team) IsPersonal() bool {
+	return t.OwnerUserId != 0
 }
 
 // TeamMember gives a user a role on a team.
@@ -83,29 +100,79 @@ func GetTeam(id int64) (Team, error) {
 	return t, err
 }
 
+// GetSharedTeams returns every shared (non-personal) team, ordered by name.
+// It's used by provider admins, who manage teams across all tenants.
+func GetSharedTeams() ([]Team, error) {
+	teams := []Team{}
+	err := db.Where("owner_user_id = 0").Order("name").Find(&teams).Error
+	return teams, err
+}
+
+// GetSharedTeamsByTenant returns the tenant's shared (non-personal) teams,
+// ordered by name. Personal teams never appear in team management.
+func GetSharedTeamsByTenant(tid int64) ([]Team, error) {
+	teams := []Team{}
+	err := db.Where("tenant_id = ? AND owner_user_id = 0", tid).Order("name").Find(&teams).Error
+	return teams, err
+}
+
 // GetDefaultTeam returns the Default team, creating it if it doesn't exist.
 func GetDefaultTeam() (Team, error) {
 	t := Team{}
 	err := db.Where("name = ?", DefaultTeamName).Take(&t).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		t = Team{Name: DefaultTeamName, CreatedAt: time.Now().UTC()}
+		tenant, terr := GetDefaultTenant()
+		if terr != nil {
+			return t, terr
+		}
+		t = Team{Name: DefaultTeamName, TenantId: tenant.Id, CreatedAt: time.Now().UTC()}
 		err = db.Create(&t).Error
 	}
 	return t, err
 }
 
-// PostTeam creates a team.
+// PostTeam creates a shared team in the tenant named by t.TenantId.
 func PostTeam(t *Team) error {
 	t.Name = strings.TrimSpace(t.Name)
 	if t.Name == "" {
 		return ErrTeamName
 	}
+	if _, err := GetTenant(t.TenantId); err != nil {
+		return ErrTeamTenant
+	}
 	if err := ensureTeamNameFree(t.Name, 0); err != nil {
 		return err
 	}
 	t.Id = 0
+	t.OwnerUserId = 0
 	t.CreatedAt = time.Now().UTC()
 	return db.Create(t).Error
+}
+
+// EnsurePersonalTeam gives the user a private personal team they own, if they
+// don't already have one, and returns it. The stored name only has to be
+// unique; the UI shows personal teams as "Personal".
+func EnsurePersonalTeam(u User) (Team, error) {
+	t := Team{}
+	err := db.Where("owner_user_id = ?", u.Id).Take(&t).Error
+	if err == nil {
+		return t, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return t, err
+	}
+	t = Team{
+		Name:        fmt.Sprintf("Personal #%d", u.Id),
+		TenantId:    u.TenantId,
+		OwnerUserId: u.Id,
+		CreatedAt:   time.Now().UTC(),
+	}
+	return t, db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&t).Error; err != nil {
+			return err
+		}
+		return tx.Create(&TeamMember{TeamId: t.Id, UserId: u.Id, Role: TeamRoleEditor}).Error
+	})
 }
 
 // PutTeam renames a team.
@@ -148,11 +215,22 @@ var TeamObjectResources = map[string]bool{
 // teamObjectModels are the objects that belong to a team.
 var teamObjectModels = []interface{}{&Campaign{}, &Template{}, &Page{}, &Group{}, &SMTP{}}
 
-// DeleteTeam deletes a team and its memberships. It refuses to delete a
-// team that still has objects, or the only team.
+// ErrPersonalTeamNotEmpty is returned when deleting a user whose personal team
+// still holds objects. The objects are private, so they must be cleared first.
+var ErrPersonalTeamNotEmpty = errors.New("Delete the user's personal campaigns, templates, landing pages, groups, and sending profiles before deleting them")
+
+// DeleteTeam deletes a shared team and its memberships. It refuses to delete a
+// personal team, a team that still has objects, or the only shared team.
 func DeleteTeam(id int64) error {
+	team, err := GetTeam(id)
+	if err != nil {
+		return err
+	}
+	if team.IsPersonal() {
+		return ErrPersonalTeam
+	}
 	var teams int64
-	if err := db.Model(&Team{}).Count(&teams).Error; err != nil {
+	if err := db.Model(&Team{}).Where("owner_user_id = 0").Count(&teams).Error; err != nil {
 		return err
 	}
 	if teams <= 1 {
@@ -182,6 +260,36 @@ func DeleteTeam(id int64) error {
 	})
 }
 
+// DeletePersonalTeam deletes the user's personal team and its membership. The
+// team's objects are private to the user, so it refuses to delete a personal
+// team that still holds objects (they must be cleared first). It's a no-op if
+// the user has no personal team.
+func DeletePersonalTeam(uid int64) error {
+	t := Team{}
+	err := db.Where("owner_user_id = ?", uid).Take(&t).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	for _, m := range teamObjectModels {
+		var count int64
+		if err := db.Model(m).Where("team_id = ?", t.Id).Count(&count).Error; err != nil {
+			return err
+		}
+		if count > 0 {
+			return ErrPersonalTeamNotEmpty
+		}
+	}
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("team_id = ?", t.Id).Delete(&TeamMember{}).Error; err != nil {
+			return err
+		}
+		return tx.Where("id = ?", t.Id).Delete(&Team{}).Error
+	})
+}
+
 // GetTeamMembers returns the team's members, ordered by username.
 func GetTeamMembers(tid int64) ([]TeamMemberDetail, error) {
 	members := []TeamMemberDetail{}
@@ -199,6 +307,13 @@ func GetTeamMembers(tid int64) ([]TeamMemberDetail, error) {
 func SetTeamMember(tid, uid int64, role string) error {
 	if !validTeamRole(role) {
 		return ErrTeamRole
+	}
+	t, err := GetTeam(tid)
+	if err != nil {
+		return err
+	}
+	if t.IsPersonal() {
+		return ErrPersonalTeam
 	}
 	return db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("team_id = ? AND user_id = ?", tid, uid).Delete(&TeamMember{}).Error; err != nil {
@@ -219,8 +334,12 @@ func SetUserTeams(uid int64, memberships []TeamMember) error {
 		if !validTeamRole(m.Role) {
 			return ErrTeamRole
 		}
-		if _, err := GetTeam(m.TeamId); err != nil {
+		t, err := GetTeam(m.TeamId)
+		if err != nil {
 			return err
+		}
+		if t.IsPersonal() {
+			return ErrPersonalTeam
 		}
 	}
 	return db.Transaction(func(tx *gorm.DB) error {
@@ -238,25 +357,43 @@ func SetUserTeams(uid int64, memberships []TeamMember) error {
 }
 
 // GetUserTeams returns the teams the user can use and their role on each.
-// Users who can modify the system can edit every team.
+//
+// The result depends on the user's global role:
+//   - provider admins (manage_tenants) get editor on every team, in every
+//     tenant, including other users' personal teams (full oversight).
+//   - tenant admins (modify_system) get editor on every team in their own
+//     tenant, including personal teams within it.
+//   - everyone else gets only the teams they're a member of — their own
+//     personal team plus any shared teams they've been added to — so a regular
+//     user never sees a peer's personal team.
 func GetUserTeams(u User) ([]TeamMembership, error) {
 	memberships := []TeamMembership{}
+	provider, err := u.HasPermission(PermissionManageTenants)
+	if err != nil {
+		return memberships, err
+	}
 	admin, err := u.HasPermission(PermissionModifySystem)
 	if err != nil {
 		return memberships, err
 	}
-	if admin {
-		teams, err := GetTeams()
-		if err != nil {
+	if provider || admin {
+		q := db.Table("teams").
+			Select("teams.id, teams.name, teams.created_at, teams.tenant_id, teams.owner_user_id")
+		// Tenant admins are limited to their own tenant; provider admins span
+		// every tenant.
+		if !provider {
+			q = q.Where("teams.tenant_id = ?", u.TenantId)
+		}
+		if err := q.Order("teams.name").Scan(&memberships).Error; err != nil {
 			return memberships, err
 		}
-		for _, t := range teams {
-			memberships = append(memberships, TeamMembership{Team: t, Role: TeamRoleEditor})
+		for i := range memberships {
+			memberships[i].Role = TeamRoleEditor
 		}
 		return memberships, nil
 	}
 	err = db.Table("teams").
-		Select("teams.id, teams.name, teams.created_at, team_members.role").
+		Select("teams.id, teams.name, teams.created_at, teams.tenant_id, teams.owner_user_id, team_members.role").
 		Joins("JOIN team_members ON team_members.team_id = teams.id").
 		Where("team_members.user_id = ?", u.Id).
 		Order("teams.name").

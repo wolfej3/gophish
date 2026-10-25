@@ -21,12 +21,17 @@ func createUnpriviledgedUser(t *testing.T, slug string) *models.User {
 	if err != nil {
 		t.Fatalf("error getting role by slug: %v", err)
 	}
+	tenant, err := models.GetDefaultTenant()
+	if err != nil {
+		t.Fatalf("error getting default tenant: %v", err)
+	}
 	unauthorizedUser := &models.User{
 		Username: "foo",
 		Hash:     "bar",
 		ApiKey:   "12345",
 		Role:     role,
 		RoleID:   role.ID,
+		TenantId: tenant.Id,
 	}
 	err = models.PutUser(unauthorizedUser)
 	if err != nil {

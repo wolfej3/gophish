@@ -119,6 +119,8 @@ func (as *Server) registerRoutes() {
 	router.HandleFunc("/teams/{id:[0-9]+}", as.Team)
 	router.HandleFunc("/teams/{id:[0-9]+}/members", as.TeamMembers)
 	router.HandleFunc("/teams/{id:[0-9]+}/members/{uid:[0-9]+}", as.TeamMember)
+	router.HandleFunc("/tenants/", mid.Use(as.Tenants, mid.RequirePermission(models.PermissionManageTenants)))
+	router.HandleFunc("/tenants/{id:[0-9]+}", mid.Use(as.Tenant, mid.RequirePermission(models.PermissionManageTenants)))
 	router.HandleFunc("/api_keys/", as.APIKeys)
 	router.HandleFunc("/api_keys/{id:[0-9]+}", as.APIKey)
 	router.HandleFunc("/audit_log/", mid.Use(as.AuditLog, mid.RequirePermission(models.PermissionModifySystem)))

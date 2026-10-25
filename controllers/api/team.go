@@ -19,6 +19,24 @@ func (as *Server) Teams(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		u := ctx.Get(r, "user").(models.User)
+		// scope=shared backs the team-management page: shared teams only, in
+		// the acting tenant (all tenants for a provider admin). The default
+		// backs the team switcher: every team the user can use, incl. personal.
+		if r.URL.Query().Get("scope") == "shared" {
+			var teams []models.Team
+			var err error
+			if isProviderAdmin(r) {
+				teams, err = models.GetSharedTeams()
+			} else {
+				teams, err = models.GetSharedTeamsByTenant(u.TenantId)
+			}
+			if err != nil {
+				JSONResponse(w, models.Response{Success: false, Message: "Error fetching teams"}, http.StatusInternalServerError)
+				return
+			}
+			JSONResponse(w, teams, http.StatusOK)
+			return
+		}
 		teams, err := models.GetUserTeams(u)
 		if err != nil {
 			JSONResponse(w, models.Response{Success: false, Message: "Error fetching teams"}, http.StatusInternalServerError)
@@ -29,10 +47,19 @@ func (as *Server) Teams(w http.ResponseWriter, r *http.Request) {
 		if !as.requireSystemAdmin(w, r) {
 			return
 		}
+		u := ctx.Get(r, "user").(models.User)
 		t := models.Team{}
 		if err := json.NewDecoder(r.Body).Decode(&t); err != nil {
 			JSONResponse(w, models.Response{Success: false, Message: "Invalid request"}, http.StatusBadRequest)
 			return
+		}
+		// A tenant admin can only create teams in their own tenant; a provider
+		// admin may target any tenant via the request body (defaulting to their
+		// own).
+		if !isProviderAdmin(r) {
+			t.TenantId = u.TenantId
+		} else if t.TenantId == 0 {
+			t.TenantId = u.TenantId
 		}
 		if err := models.PostTeam(&t); err != nil {
 			JSONResponse(w, models.Response{Success: false, Message: err.Error()}, teamErrorStatus(err))
@@ -51,7 +78,7 @@ func (as *Server) Team(w http.ResponseWriter, r *http.Request) {
 	}
 	id, _ := strconv.ParseInt(mux.Vars(r)["id"], 0, 64)
 	existing, err := models.GetTeam(id)
-	if err != nil {
+	if err != nil || !canManageTeam(r, existing) {
 		JSONResponse(w, models.Response{Success: false, Message: "Team not found"}, http.StatusNotFound)
 		return
 	}
@@ -94,7 +121,8 @@ func (as *Server) TeamMembers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id, _ := strconv.ParseInt(mux.Vars(r)["id"], 0, 64)
-	if _, err := models.GetTeam(id); err != nil {
+	team, err := models.GetTeam(id)
+	if err != nil || !canManageTeam(r, team) {
 		JSONResponse(w, models.Response{Success: false, Message: "Team not found"}, http.StatusNotFound)
 		return
 	}
@@ -112,8 +140,14 @@ func (as *Server) TeamMembers(w http.ResponseWriter, r *http.Request) {
 			JSONResponse(w, models.Response{Success: false, Message: "Invalid request"}, http.StatusBadRequest)
 			return
 		}
-		if _, err := models.GetUser(req.UserId); err != nil {
+		member, err := models.GetUser(req.UserId)
+		if err != nil {
 			JSONResponse(w, models.Response{Success: false, Message: "User not found"}, http.StatusNotFound)
+			return
+		}
+		// A user can only be added to a team in their own tenant.
+		if member.TenantId != team.TenantId {
+			JSONResponse(w, models.Response{Success: false, Message: "User is not in this team's tenant"}, http.StatusBadRequest)
 			return
 		}
 		if err := models.SetTeamMember(id, req.UserId, req.Role); err != nil {
@@ -137,6 +171,11 @@ func (as *Server) TeamMember(w http.ResponseWriter, r *http.Request) {
 	}
 	id, _ := strconv.ParseInt(mux.Vars(r)["id"], 0, 64)
 	uid, _ := strconv.ParseInt(mux.Vars(r)["uid"], 0, 64)
+	team, err := models.GetTeam(id)
+	if err != nil || !canManageTeam(r, team) {
+		JSONResponse(w, models.Response{Success: false, Message: "Team not found"}, http.StatusNotFound)
+		return
+	}
 	if err := models.RemoveTeamMember(id, uid); err != nil {
 		JSONResponse(w, models.Response{Success: false, Message: "Error removing member"}, http.StatusInternalServerError)
 		return
@@ -160,11 +199,24 @@ func (as *Server) requireSystemAdmin(w http.ResponseWriter, r *http.Request) boo
 	return true
 }
 
+// canManageTeam reports whether the current user may manage the given team: a
+// provider admin may manage any team; a tenant admin only teams in their own
+// tenant.
+func canManageTeam(r *http.Request, team models.Team) bool {
+	if isProviderAdmin(r) {
+		return true
+	}
+	u := ctx.Get(r, "user").(models.User)
+	return team.TenantId == u.TenantId
+}
+
 // teamErrorStatus maps a team error to an HTTP status code.
 func teamErrorStatus(err error) int {
 	switch {
 	case errors.Is(err, models.ErrTeamName), errors.Is(err, models.ErrTeamRole),
-		errors.Is(err, models.ErrTeamNotEmpty), errors.Is(err, models.ErrLastTeam):
+		errors.Is(err, models.ErrTeamNotEmpty), errors.Is(err, models.ErrLastTeam),
+		errors.Is(err, models.ErrTeamTenant), errors.Is(err, models.ErrPersonalTeam),
+		errors.Is(err, models.ErrPersonalTeamNotEmpty):
 		return http.StatusBadRequest
 	case errors.Is(err, models.ErrTeamNameTaken):
 		return http.StatusConflict

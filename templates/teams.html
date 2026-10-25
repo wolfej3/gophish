@@ -16,6 +16,7 @@
             <thead>
                 <tr>
                     <th>Name</th>
+                    <th class="tenant-col" style="display:none;">Tenant</th>
                     <th>Members</th>
                     <th class="col-md-3 no-sort"></th>
                 </tr>
@@ -38,6 +39,10 @@
                 <label class="control-label" for="name">Name:</label>
                 <div class="form-group">
                     <input type="text" class="form-control" placeholder="Team name" id="name" autofocus />
+                </div>
+                <div class="form-group" id="tenantSelectGroup" style="display:none;">
+                    <label class="control-label" for="tenantSelect">Tenant:</label>
+                    <select class="form-control" id="tenantSelect"></select>
                 </div>
             </div>
             <div class="modal-footer">

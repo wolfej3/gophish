@@ -18,6 +18,7 @@ This version modernizes Gophish and adds admin security features. The details ar
 - **Single binary:** templates, admin assets, migrations, and the version are embedded, so Gophish runs from any directory. Building the admin assets only needs Go, not Node.js.
 - **Sessions:** admin sessions are stored in the database, survive restarts, and are revoked on logout, password change, and account lock.
 - **Admin security:** two-factor authentication, single sign-on through OIDC or SAML, an audit log, and API keys with limited permissions.
+- **Teams and tenants:** objects are shared within teams instead of per login, teams nest under isolated client **tenants**, and a provider-admin role spans every tenant. Each user also gets a private Personal team. See [Teams](#teams) and [Tenants](#tenants).
 
 #### Upgrading
 
@@ -121,13 +122,27 @@ Gophish reads the **first** entry of `X-Forwarded-For`. With nginx, set `proxy_s
 
 Campaigns, templates, landing pages, groups, and sending profiles belong to a **team** rather than to one user, so everyone on a team shares the same objects without sharing a login. Each object also records which user created it.
 
-A user has a role on each team they belong to: **editor** (create and change the team's objects) or **viewer** (read only). Users with the admin role can see and edit every team.
+A user has a role on each team they belong to: **editor** (create and change the team's objects) or **viewer** (read only). A tenant admin can see and edit every team in their own tenant; a provider admin can see and edit every team in every tenant (see **Tenants** below).
 
-Admins manage teams on the **Teams** page: create and rename teams, and add, remove, or change the role of each member. Users who belong to more than one team get a team switcher at the top of the sidebar, which decides the team the pages act in.
+Admins manage teams on the **Teams** page: create and rename teams, and add, remove, or change the role of each member. Users who belong to more than one team get a team switcher at the top of the sidebar, which decides the team the pages act in. Each user can also pick a **default team** (the one they land in when they sign in) from their Account Settings.
 
-When you upgrade, everything that existed before teams moves into a team called **Default**, and every existing user becomes an editor on it, so nothing changes until you create more teams. A new user belongs to no team until an admin adds them to one, so add new users to a team before they sign in.
+Every user also gets a private **Personal** team of their own, for solo work teammates can't see. You can't add other members to a personal team. Admins keep oversight: a tenant admin sees every personal team in their tenant and a provider admin sees them all, but one regular user never sees another's.
 
-Teams are the first step toward hosting Gophish for multiple separate client organizations; those will later contain teams.
+When you upgrade, everything that existed before teams moves into a team called **Default**, and every existing user becomes an editor on it, so nothing changes until you create more teams. Each user also gains a Personal team. A new user belongs to no shared team until an admin adds them to one.
+
+### Tenants
+
+Tenants let you host Gophish for several **separate client organizations** on one install, fully isolated from each other. A tenant contains its own teams and users; teams nest under a tenant, and every user belongs to exactly one tenant.
+
+There are three global roles:
+
+- **Provider admin** — the hosting operator. Spans every tenant, manages the tenants themselves, and can act on all teams and objects. Create and manage tenants on the **Tenants** page (provider admins only), and use the tenant switcher in the sidebar to scope the team and user lists to one tenant.
+- **Admin** — a tenant administrator. Full control over teams, users, and objects, but only within their own tenant.
+- **User** — works in the teams they belong to within their tenant.
+
+When you upgrade, everything moves into a single **Default** tenant and the bootstrap admin account becomes the provider admin; every other existing admin becomes a tenant admin of Default. Creating a tenant seeds it with a shared default team so new users have somewhere to land.
+
+A few things are intentionally out of scope: single sign-on, sending transports, and directory connectors stay operator-level configuration in `config.json`, shared across tenants (SSO-provisioned users join the Default tenant); usernames and team names are unique across the whole install, not per tenant.
 
 ### Sending through Microsoft Graph or Gmail
 

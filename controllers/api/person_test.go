@@ -71,7 +71,8 @@ func TestPersonEndpoint(t *testing.T) {
 func TestPeopleScopedToTeam(t *testing.T) {
 	testCtx := setupTest(t)
 	// A person in another team isn't visible from the default team
-	other := models.Team{Name: "Other"}
+	def, _ := models.GetDefaultTenant()
+	other := models.Team{Name: "Other", TenantId: def.Id}
 	models.PostTeam(&other)
 	c := models.Campaign{Name: "Theirs", UserId: 1, TeamId: other.Id, CreatedDate: time.Now().UTC(), Status: models.CampaignInProgress}
 	models.InsertCampaign(&c)

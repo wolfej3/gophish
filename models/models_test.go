@@ -36,7 +36,7 @@ func (s *ModelsSuite) TearDownTest(c *check.C) {
 		&Result{}, &Event{}, &MailLog{}, &Campaign{}, &Session{},
 		&CampaignSchedule{}, &ScheduleGroup{},
 		&DirectorySource{},
-		&Team{}, &TeamMember{},
+		&Team{}, &TeamMember{}, &Tenant{},
 	} {
 		if err := cleanup.Delete(model).Error; err != nil {
 			panic(err)
@@ -50,10 +50,13 @@ func (s *ModelsSuite) TearDownTest(c *check.C) {
 	if err := db.Model(&User{}).Where("id = ?", 1).Update("username", "admin").Error; err != nil {
 		panic(err)
 	}
-	// Recreate the default team with the admin as an editor, as a fresh
-	// install would have.
+	// Recreate the default tenant and team with the admin as an editor, as a
+	// fresh install would have, and keep the admin pinned to the default tenant.
 	team, err := GetDefaultTeam()
 	if err != nil {
+		panic(err)
+	}
+	if err := db.Model(&User{}).Where("id = ?", 1).Updates(map[string]interface{}{"tenant_id": team.TenantId, "default_team_id": 0}).Error; err != nil {
 		panic(err)
 	}
 	if err := SetTeamMember(team.Id, 1, TeamRoleEditor); err != nil {
@@ -150,7 +153,7 @@ func resetBenchmark(b *testing.B) {
 		&Result{}, &Event{}, &MailLog{}, &Campaign{}, &Session{},
 		&CampaignSchedule{}, &ScheduleGroup{},
 		&DirectorySource{},
-		&Team{}, &TeamMember{},
+		&Team{}, &TeamMember{}, &Tenant{},
 	} {
 		if err := cleanup.Delete(model).Error; err != nil {
 			panic(err)
@@ -164,10 +167,13 @@ func resetBenchmark(b *testing.B) {
 	if err := db.Model(&User{}).Where("id = ?", 1).Update("username", "admin").Error; err != nil {
 		panic(err)
 	}
-	// Recreate the default team with the admin as an editor, as a fresh
-	// install would have.
+	// Recreate the default tenant and team with the admin as an editor, as a
+	// fresh install would have, and keep the admin pinned to the default tenant.
 	team, err := GetDefaultTeam()
 	if err != nil {
+		panic(err)
+	}
+	if err := db.Model(&User{}).Where("id = ?", 1).Updates(map[string]interface{}{"tenant_id": team.TenantId, "default_team_id": 0}).Error; err != nil {
 		panic(err)
 	}
 	if err := SetTeamMember(team.Id, 1, TeamRoleEditor); err != nil {

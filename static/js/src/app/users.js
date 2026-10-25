@@ -1,4 +1,6 @@
 let users = []
+let tenantsById = {}
+const isProvider = !!(window.user && window.user.manage_tenants)
 
 // Save attempts to POST or PUT to /users/
 const save = (id) => {
@@ -15,6 +17,10 @@ const save = (id) => {
         account_locked: $("#account_locked_checkbox").prop('checked'),
         disable_totp: $("#disable_totp_checkbox").prop('checked'),
         unlink_oidc: $("#unlink_oidc_checkbox").prop('checked')
+    }
+    // A provider admin chooses which tenant a new user joins.
+    if (isProvider && id == -1) {
+        user.tenant_id = parseInt($("#tenantSelect").val(), 10) || 0
     }
     // Submit the user
     if (id != -1) {
@@ -66,11 +72,17 @@ const edit = (id) => {
         save(id)
     })
     $("#role").select2()
+    // Only a provider admin can see or assign the provider_admin role.
+    $(".provider-role-option").toggle(isProvider)
     if (id == -1) {
         $("#userModalLabel").text("New User")
         $("#role").val("user")
         $("#role").trigger("change")
+        // A provider admin picks the tenant for a new user; it can't be changed
+        // afterward, so the selector only shows when creating.
+        $("#tenantSelectGroup").toggle(isProvider)
     } else {
+        $("#tenantSelectGroup").hide()
         $("#userModalLabel").text("Edit User")
         api.userId.get(id)
             .success((user) => {
@@ -83,9 +95,6 @@ const edit = (id) => {
                 let identities = [user.oidc_identity, user.saml_identity].filter((i) => i)
                 $("#unlink_oidc_group").toggleClass("hidden", identities.length == 0)
                 $("#oidc_identity").text(identities.join(", "))
-                if (user.username == "admin") {
-                    $("#username").attr("disabled", true);
-                }
             })
             .error(function () {
                 errorFlash("Error fetching user")
@@ -98,14 +107,8 @@ const deleteUser = (id) => {
     if (!user) {
         return
     }
-    if (user.username == "admin") {
-        Swal.fire({
-            title: "Unable to Delete User",
-            text: "The user account " + escapeHtml(user.username) + " cannot be deleted.",
-            type: "info"
-        });
-        return
-    }
+    // The backend refuses to remove the last provider or tenant admin and
+    // returns a clear error, so the UI no longer special-cases any username.
     Swal.fire({
         title: "Are you sure?",
         text: "This will delete the account for " + escapeHtml(user.username) + " as well as all of the objects they have created.\n\nThis can't be undone!",
@@ -214,12 +217,18 @@ const load = () => {
             users = us
             $("#loading").hide()
             $("#userTable").show()
+            let columnDefs = [{
+                orderable: false,
+                targets: "no-sort"
+            }]
+            // The Tenant column (index 1) is only useful to a provider admin,
+            // who works across tenants; hide it for everyone else.
+            if (!isProvider) {
+                columnDefs.push({ visible: false, targets: 1 })
+            }
             let userTable = $("#userTable").DataTable({
                 destroy: true,
-                columnDefs: [{
-                    orderable: false,
-                    targets: "no-sort"
-                }]
+                columnDefs: columnDefs
             });
             userTable.clear();
             userRows = []
@@ -228,8 +237,10 @@ const load = () => {
                 if (user.last_login != "0001-01-01T00:00:00Z") {
                     lastlogin = moment(user.last_login).format('MMMM Do YYYY, h:mm:ss a')
                 }
+                let tenant = tenantsById[user.tenant_id]
                 userRows.push([
                     escapeHtml(user.username),
+                    tenant ? escapeHtml(tenant.name) : "",
                     escapeHtml(user.role.name),
                     lastlogin,
                     signInMethods(user),
@@ -253,7 +264,21 @@ const load = () => {
 }
 
 $(document).ready(function () {
-    load()
+    // Provider admins need the tenant list to label users and to place new ones.
+    if (isProvider) {
+        api.tenants.get()
+            .success((ts) => {
+                const select = $("#tenantSelect").empty()
+                $.each(ts, (i, t) => {
+                    tenantsById[t.id] = t
+                    select.append($("<option>").val(t.id).text(t.name))
+                })
+                load()
+            })
+            .error(() => load())
+    } else {
+        load()
+    }
     // Setup the event listeners
     $("#modal").on("hide.bs.modal", function () {
         dismiss();

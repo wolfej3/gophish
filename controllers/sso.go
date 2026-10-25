@@ -146,6 +146,12 @@ func ssoUser(id ssoIdentity, accounts ssoAccounts) (models.User, error) {
 	if err != nil {
 		return u, fmt.Errorf("getting role %q: %w", accounts.DefaultRole, err)
 	}
+	// Single sign-on is operator-level config shared across tenants, so an
+	// auto-provisioned account lands in the Default tenant.
+	tenant, err := models.GetDefaultTenant()
+	if err != nil {
+		return u, err
+	}
 	// The account signs in only through single sign-on, so its password is
 	// a random one nobody knows.
 	hash, err := auth.GeneratePasswordHash(auth.GenerateSecureKey(32))
@@ -158,9 +164,15 @@ func ssoUser(id ssoIdentity, accounts ssoAccounts) (models.User, error) {
 		ApiKey:   auth.GenerateSecureKey(auth.APIKeyLength),
 		Role:     role,
 		RoleID:   role.ID,
+		TenantId: tenant.Id,
 	}
 	u.SetSSOIdentity(id.Provider, id.Identity)
 	if err := models.PutUser(&u); err != nil {
+		return u, err
+	}
+	// Give the account a private personal team. Their default team is left
+	// unset until they choose one.
+	if _, err := models.EnsurePersonalTeam(u); err != nil {
 		return u, err
 	}
 	log.Infof("created account %q for single sign-on identity %q", username, id.Identity)

@@ -6,15 +6,18 @@ Design:
 Gophish implements simple Role-Based-Access-Control (RBAC) to control access to
 certain resources.
 
-By default, Gophish has two separate roles, with each user being assigned to
-a single role:
+Each user is assigned a single global role:
 
-* Admin  - Can modify all objects as well as system-level configuration
-* User   - Can modify all objects
+* Provider Admin - The hosting operator. Spans every tenant, manages the
+                   tenants themselves, and can act on all teams and objects.
+* Admin          - A tenant administrator. Can modify all objects and
+                   system-level configuration within their own tenant.
+* User           - Can modify objects in the teams they belong to.
 
-It's important to note that these are global roles. In the future, we'll likely
-add the concept of teams, which will include their own roles and permission
-system similar to these global permissions.
+Objects belong to teams, and teams nest under tenants (see team.go and
+tenant.go). A user's global role combines with their tenant and team
+memberships to decide what they can reach: GetUserTeams is where the role,
+tenant, and membership rules come together.
 
 Each role maps to one or more permissions, making it easy to add more granular
 permissions over time.
@@ -26,9 +29,13 @@ requested permission.
 */
 
 const (
-	// RoleAdmin is used for Gophish system administrators. Users with this
-	// role have the ability to manage all objects within Gophish, as well as
-	// system-level configuration, such as users and URLs.
+	// RoleProviderAdmin is used for the hosting operator. Users with this role
+	// span every tenant: they manage the tenants themselves and have full
+	// access to all teams and objects across the system.
+	RoleProviderAdmin = "provider_admin"
+	// RoleAdmin is used for Gophish tenant administrators. Users with this role
+	// can manage all objects and system-level configuration within their own
+	// tenant, such as its users and teams.
 	RoleAdmin = "admin"
 	// RoleUser is used for standard Gophish users. Users with this role can
 	// create, manage, and view Gophish objects and campaigns.
@@ -43,6 +50,10 @@ const (
 	// PermissionModifySystem determines if a role can manage system-level
 	// configuration.
 	PermissionModifySystem = "modify_system"
+	// PermissionManageTenants determines if a role can create and manage
+	// tenants, and act across every tenant. Only the provider_admin role has
+	// it.
+	PermissionManageTenants = "manage_tenants"
 )
 
 // Role represents a user role within Gophish. Each user has a single role
