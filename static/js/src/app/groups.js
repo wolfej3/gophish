@@ -10,7 +10,8 @@ function save(id) {
             first_name: unescapeHtml(target[0]),
             last_name: unescapeHtml(target[1]),
             email: unescapeHtml(target[2]),
-            position: unescapeHtml(target[3])
+            phone: unescapeHtml(target[3]),
+            position: unescapeHtml(target[4])
         })
     })
     var group = {
@@ -150,6 +151,7 @@ function edit(id) {
                       escapeHtml(record.first_name),
                       escapeHtml(record.last_name),
                       escapeHtml(record.email),
+                      escapeHtml(record.phone),
                       escapeHtml(record.position),
                       '<span style="cursor:pointer;"><i class="fa fa-trash-o"></i></span>'
                   ])
@@ -183,6 +185,7 @@ function edit(id) {
                     record.first_name,
                     record.last_name,
                     record.email,
+                    record.phone,
                     record.position);
             });
             targets.DataTable().draw();
@@ -195,6 +198,7 @@ var downloadCSVTemplate = function () {
         'First Name': 'Example',
         'Last Name': 'User',
         'Email': 'foobar@example.com',
+        'Phone': '+15551234567',
         'Position': 'Systems Administrator'
     }]
     var filename = 'group_template.csv'
@@ -258,13 +262,14 @@ var deleteGroup = function (id) {
     })
 }
 
-function addTarget(firstNameInput, lastNameInput, emailInput, positionInput) {
+function addTarget(firstNameInput, lastNameInput, emailInput, phoneInput, positionInput) {
     // Create new data row.
     var email = escapeHtml(emailInput).toLowerCase();
     var newRow = [
         escapeHtml(firstNameInput),
         escapeHtml(lastNameInput),
         email,
+        escapeHtml(phoneInput),
         escapeHtml(positionInput),
         '<span style="cursor:pointer;"><i class="fa fa-trash-o"></i></span>'
     ];
@@ -342,6 +347,7 @@ function reloadTargetsFromGroup(group) {
             escapeHtml(record.first_name),
             escapeHtml(record.last_name),
             escapeHtml(record.email),
+            escapeHtml(record.phone),
             escapeHtml(record.position),
             '<span style="cursor:pointer;"><i class="fa fa-trash-o"></i></span>'
         ])
@@ -402,6 +408,7 @@ $(document).ready(function () {
             $("#firstName").val(),
             $("#lastName").val(),
             $("#email").val(),
+            $("#phone").val(),
             $("#position").val());
         targets.DataTable().draw();
 

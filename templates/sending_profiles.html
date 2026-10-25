@@ -53,11 +53,13 @@
                             <option value="SMTP">SMTP</option>
                             <option value="Microsoft Graph">Microsoft Graph (Entra ID)</option>
                             <option value="Gmail">Gmail (Google Workspace)</option>
+                            <option value="SMS">SMS (Twilio)</option>
                         </select>
-                        <label class="control-label" for="from"><span id="fromLabel">SMTP From</span>: <i class="fa fa-question-circle"
-                                data-toggle="tooltip" data-placement="right" title="Set this to an email address from your sending domain. For Microsoft Graph and Gmail this is the mailbox the message is sent as."></i></label>
-                        <input type="text" class="form-control" placeholder="test@example.com" id="from"
-                            required />
+                        <div class="transport-email-from">
+                            <label class="control-label" for="from"><span id="fromLabel">SMTP From</span>: <i class="fa fa-question-circle"
+                                    data-toggle="tooltip" data-placement="right" title="Set this to an email address from your sending domain. For Microsoft Graph and Gmail this is the mailbox the message is sent as."></i></label>
+                            <input type="text" class="form-control" placeholder="test@example.com" id="from" />
+                        </div>
                         <!-- SMTP fields -->
                         <div class="transport-smtp">
                             <label class="control-label" for="host">Host:</label>
@@ -87,6 +89,20 @@
                             <p class="help-block small">A service account with domain-wide delegation for the <code>gmail.send</code> scope. The From address above is the Workspace user to send as.</p>
                             <label class="control-label" for="credentials_file">Service account credentials file:</label>
                             <input type="text" class="form-control" id="credentials_file" placeholder="/etc/gophish/google-sa.json" />
+                        </div>
+                        <!-- SMS fields -->
+                        <div class="transport-sms hidden">
+                            <p class="help-block small">Sends SMS text messages instead of email. Recipients need a phone number, and the template's text content is used as the message body (put <code>{{"{{"}}.URL{{"}}"}}</code> in it for the masked tracked link).</p>
+                            <label class="control-label" for="sms_provider">SMS Provider:</label>
+                            <select class="form-control" id="sms_provider">
+                                <option value="twilio">Twilio</option>
+                            </select>
+                            <label class="control-label" for="sms_from">From number:</label>
+                            <input type="text" class="form-control" id="sms_from" placeholder="+15551234567 or a messaging service SID" />
+                            <label class="control-label" for="sms_username">Account SID:</label>
+                            <input type="text" class="form-control" id="sms_username" placeholder="AC..." />
+                            <label class="control-label" for="sms_password">Auth Token:</label>
+                            <input type="password" class="form-control" id="sms_password" autocomplete="new-password" />
                         </div>
                     </div>
                     <fieldset class="form-group">

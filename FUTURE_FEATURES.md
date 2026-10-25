@@ -40,6 +40,13 @@ how real orgs text branded shortened links. The code→recipient mapping is
 unchanged; only the host used to build the link differs, plus its own TLS and
 DNS.
 
+### SMS lures — phone-only targets
+Today a group target still requires a valid email address even if the campaign
+only sends SMS. Supporting **phone-only** targets (no email) means relaxing
+target validation and changing campaign recipient de-duplication to key on the
+phone number when no email is present, plus making the email column optional in
+the group UI/CSV. Deferred to keep the first SMS release low-risk.
+
 ### SMS lures — additional providers
 The SMS channel ships with Twilio behind a small provider interface. Additional
 providers (Vonage/Nexmo, AWS SNS, MessageBird, Telnyx, …) can be added as new

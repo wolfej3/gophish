@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/gophish/gophish/config"
@@ -9,6 +10,7 @@ import (
 	log "github.com/gophish/gophish/logger"
 	"github.com/gophish/gophish/mailer"
 	"github.com/gophish/gophish/models"
+	"github.com/gophish/gophish/sms"
 	"github.com/sirupsen/logrus"
 )
 
@@ -124,6 +126,9 @@ func (w *DefaultWorker) processCampaigns(t time.Time) error {
 	// instead of having to re-connect to the SMTP server for every
 	// email.
 	msg := make(map[int64][]mailer.Mail)
+	// SMS campaigns are sent through the provider API rather than the mailer,
+	// so they're grouped separately.
+	smsMsg := make(map[int64][]*models.MailLog)
 	for _, m := range ms {
 		// We cache the campaign here to greatly reduce the time it takes to
 		// generate the message (ref #1726)
@@ -136,7 +141,11 @@ func (w *DefaultWorker) processCampaigns(t time.Time) error {
 			campaignCache[c.Id] = c
 		}
 		m.CacheCampaign(&c)
-		msg[m.CampaignId] = append(msg[m.CampaignId], m)
+		if c.SMTP.Interface == models.SMSInterface {
+			smsMsg[m.CampaignId] = append(smsMsg[m.CampaignId], m)
+		} else {
+			msg[m.CampaignId] = append(msg[m.CampaignId], m)
+		}
 	}
 
 	// Next, we process each group of maillogs in parallel
@@ -156,7 +165,64 @@ func (w *DefaultWorker) processCampaigns(t time.Time) error {
 			w.mailer.Queue(msc)
 		}(cid, msc)
 	}
+	// Process SMS campaigns through the provider API.
+	for cid, msc := range smsMsg {
+		go func(cid int64, msc []*models.MailLog) {
+			w.sendCampaignSMS(campaignCache[cid], msc)
+		}(cid, msc)
+	}
 	return nil
+}
+
+// sendCampaignSMS sends the given maillogs for an SMS campaign through the
+// campaign's SMS sending profile, recording success or failure on each result
+// the same way the mail path does. Maillogs scheduled for the future are left
+// locked for a later tick.
+func (w *DefaultWorker) sendCampaignSMS(c models.Campaign, ms []*models.MailLog) {
+	if c.Status == models.CampaignQueued {
+		if err := c.UpdateStatus(models.CampaignInProgress); err != nil {
+			log.Error(err)
+		}
+	}
+	sender, err := sms.New(c.SMTP.SMSProvider, c.SMTP.Username, c.SMTP.Password)
+	if err != nil {
+		log.Error(err)
+		for _, m := range ms {
+			m.Error(err)
+		}
+		return
+	}
+	log.WithFields(logrus.Fields{
+		"num_sms": len(ms),
+	}).Info("Sending SMS messages for processing")
+	now := time.Now().UTC()
+	for _, m := range ms {
+		if m.SendDate.After(now) {
+			m.Unlock()
+			continue
+		}
+		to, body, err := m.GenerateSMS()
+		if err != nil {
+			log.Error(err)
+			m.Error(err)
+			continue
+		}
+		if to == "" {
+			m.Error(errors.New("recipient has no phone number"))
+			continue
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
+		err = sender.Send(ctx, sms.Message{To: to, From: c.SMTP.SMSFrom, Body: body})
+		cancel()
+		if err != nil {
+			log.WithFields(logrus.Fields{"to": to}).Errorf("SMS send failed: %v", err)
+			m.Error(err)
+			continue
+		}
+		if err := m.Success(); err != nil {
+			log.Error(err)
+		}
+	}
 }
 
 // launchDueSchedules spawns a campaign from each recurring schedule whose next
@@ -227,6 +293,14 @@ func (w *DefaultWorker) LaunchCampaign(c models.Campaign) {
 	campaignMailCtx, err := models.GetCampaignMailContext(c.Id, c.TeamId)
 	if err != nil {
 		log.Error(err)
+		return
+	}
+	// SMS campaigns are sent through the provider API, not the mailer.
+	if campaignMailCtx.SMTP.Interface == models.SMSInterface {
+		for _, m := range ms {
+			m.CacheCampaign(&campaignMailCtx)
+		}
+		w.sendCampaignSMS(campaignMailCtx, ms)
 		return
 	}
 	for _, m := range ms {

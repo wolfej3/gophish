@@ -21,6 +21,7 @@ type TemplateContext interface {
 type PhishingTemplateContext struct {
 	From        string
 	URL         string
+	ShortURL    string
 	Tracker     string
 	QR          string
 	TrackingURL string
@@ -29,16 +30,24 @@ type PhishingTemplateContext struct {
 	BaseRecipient
 }
 
+// ShortLinkPath is the URL path prefix that resolves a masked short link to its
+// recipient. A masked link looks like https://host/l/<rid> and serves the
+// landing page directly, so the tracking id never appears in the address bar.
+const ShortLinkPath = "/l/"
+
 // NewPhishingTemplateContext returns a populated PhishingTemplateContext,
 // parsing the correct fields from the provided TemplateContext and recipient.
 func NewPhishingTemplateContext(ctx TemplateContext, r BaseRecipient, rid string) (PhishingTemplateContext, error) {
-	f, err := mail.ParseAddress(ctx.getFromAddress())
-	if err != nil {
-		return PhishingTemplateContext{}, err
-	}
-	fn := f.Name
-	if fn == "" {
-		fn = f.Address
+	// The From field is an email sender name. SMS profiles have no email From
+	// address, so an unparseable (or empty) value isn't fatal — we just leave
+	// From as the raw value. Email profiles always have a valid From (enforced
+	// by SMTP.Validate), so their behavior is unchanged.
+	fn := ctx.getFromAddress()
+	if f, err := mail.ParseAddress(fn); err == nil {
+		fn = f.Name
+		if fn == "" {
+			fn = f.Address
+		}
 	}
 	templateURL, err := ExecuteTemplate(ctx.getBaseURL(), r)
 	if err != nil {
@@ -67,6 +76,7 @@ func NewPhishingTemplateContext(ctx TemplateContext, r BaseRecipient, rid string
 		BaseRecipient: r,
 		BaseURL:       baseURL.String(),
 		URL:           phishURL.String(),
+		ShortURL:      baseURL.String() + ShortLinkPath + rid,
 		TrackingURL:   trackingURL.String(),
 		Tracker:       "<img alt='' style='display: none' src='" + trackingURL.String() + "'/>",
 		QR:            "<img alt='' src='" + qrCIDRef + "'/>",

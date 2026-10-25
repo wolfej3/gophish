@@ -11,6 +11,46 @@ import (
 	"github.com/gophish/gophish/models"
 )
 
+func buildCSVRequestWithHeader(csvHeader, csvPayload string) (*http.Request, error) {
+	body := new(bytes.Buffer)
+	writer := multipart.NewWriter(body)
+	part, err := writer.CreateFormFile("files[]", "example.csv")
+	if err != nil {
+		return nil, err
+	}
+	part.Write([]byte(csvHeader))
+	part.Write([]byte(csvPayload))
+	if err = writer.Close(); err != nil {
+		return nil, err
+	}
+	r, err := http.NewRequest("POST", "http://127.0.0.1", body)
+	if err != nil {
+		return nil, err
+	}
+	r.Header.Set("Content-Type", writer.FormDataContentType())
+	return r, nil
+}
+
+func TestParseCSVPhone(t *testing.T) {
+	r, err := buildCSVRequestWithHeader("First Name,Last Name,Email,Phone\n", "Jane,Doe,<jane@example.com>,+15551234567")
+	if err != nil {
+		t.Fatalf("error building CSV request: %v", err)
+	}
+	got, err := ParseCSV(r)
+	if err != nil {
+		t.Fatalf("error parsing CSV: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("expected 1 target, got %d", len(got))
+	}
+	if got[0].Phone != "+15551234567" {
+		t.Errorf("phone = %q, want +15551234567", got[0].Phone)
+	}
+	if got[0].Email != "jane@example.com" {
+		t.Errorf("email = %q", got[0].Email)
+	}
+}
+
 func buildCSVRequest(csvPayload string) (*http.Request, error) {
 	csvHeader := "First Name,Last Name,Email\n"
 	body := new(bytes.Buffer)

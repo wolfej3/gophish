@@ -270,6 +270,37 @@ func (m *MailLog) Generate(msg *gomail.Message) error {
 	return nil
 }
 
+// GenerateSMS renders the SMS body and returns the recipient's phone number
+// for this maillog's campaign and recipient. The campaign template's Text is
+// used as the message body, with {{.URL}} resolving to the masked short link so
+// the visible URL carries no tracking parameter.
+func (m *MailLog) GenerateSMS() (to string, body string, err error) {
+	r, err := GetResult(m.RId)
+	if err != nil {
+		return "", "", err
+	}
+	c := m.cachedCampaign
+	if c == nil {
+		campaign, err := GetCampaignMailContext(m.CampaignId, m.TeamId)
+		if err != nil {
+			return "", "", err
+		}
+		c = &campaign
+	}
+	ptx, err := NewPhishingTemplateContext(c, r.BaseRecipient, r.RId)
+	if err != nil {
+		return "", "", err
+	}
+	// In an SMS the whole URL is visible, so default {{.URL}} to the masked
+	// short link rather than the full ?rid= URL.
+	ptx.URL = ptx.ShortURL
+	body, err = ExecuteTemplate(c.Template.Text, ptx)
+	if err != nil {
+		return "", "", err
+	}
+	return r.Phone, body, nil
+}
+
 // GetQueuedMailLogs returns the mail logs that are queued up for the given minute.
 func GetQueuedMailLogs(t time.Time) ([]*MailLog, error) {
 	ms := []*MailLog{}

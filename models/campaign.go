@@ -114,6 +114,9 @@ var ErrPageNotSpecified = errors.New("No landing page specified")
 // ErrSMTPNotSpecified indicates a sending profile was not provided for the campaign
 var ErrSMTPNotSpecified = errors.New("No sending profile specified")
 
+// ErrSMSTemplateText indicates an SMS campaign's template has no text body
+var ErrSMSTemplateText = errors.New("SMS campaigns need a template with text content")
+
 // ErrTemplateNotFound indicates the template specified does not exist in the database
 var ErrTemplateNotFound = errors.New("Template not found")
 
@@ -533,6 +536,11 @@ func PostCampaign(c *Campaign, uid, tid int64) error {
 	}
 	c.SMTP = s
 	c.SMTPId = s.Id
+	// An SMS campaign's body comes from the template's text content, so it
+	// must be present.
+	if s.Interface == SMSInterface && c.Template.Text == "" {
+		return ErrSMSTemplateText
+	}
 	// Insert into the DB
 	err = db.Save(c).Error
 	if err != nil {
@@ -563,6 +571,7 @@ func PostCampaign(c *Campaign, uid, tid int64) error {
 					Position:  t.Position,
 					FirstName: t.FirstName,
 					LastName:  t.LastName,
+					Phone:     t.Phone,
 				},
 				Status:       StatusScheduled,
 				CampaignId:   c.Id,

@@ -44,13 +44,18 @@ function sendTestEmail() {
 // showTransportFields shows only the fields that apply to the chosen
 // interface type, and updates the "From" label.
 function showTransportFields(interfaceType) {
-    $(".transport-smtp, .transport-graph, .transport-gmail").addClass("hidden")
+    $(".transport-smtp, .transport-graph, .transport-gmail, .transport-sms").addClass("hidden")
+    $(".transport-email-from").removeClass("hidden")
     if (interfaceType === "Microsoft Graph") {
         $(".transport-graph").removeClass("hidden")
         $("#fromLabel").text("Send as")
     } else if (interfaceType === "Gmail") {
         $(".transport-gmail").removeClass("hidden")
         $("#fromLabel").text("Send as")
+    } else if (interfaceType === "SMS") {
+        // SMS profiles have no email From address.
+        $(".transport-sms").removeClass("hidden")
+        $(".transport-email-from").addClass("hidden")
     } else {
         $(".transport-smtp").removeClass("hidden")
         $("#fromLabel").text("SMTP From")
@@ -79,6 +84,13 @@ function save(idx) {
     profile.client_id = $("#client_id").val()
     profile.client_secret = $("#client_secret").val()
     profile.credentials_file = $("#credentials_file").val()
+    // SMS profiles reuse username/password for the provider's SID/token.
+    if (profile.interface_type === "SMS") {
+        profile.sms_provider = $("#sms_provider").val()
+        profile.sms_from = $("#sms_from").val()
+        profile.username = $("#sms_username").val()
+        profile.password = $("#sms_password").val()
+    }
     if (idx != -1) {
         profile.id = profiles[idx].id
         api.SMTPId.put(profile)
@@ -114,6 +126,8 @@ function dismiss() {
     $("#password").val("")
     $("#ignore_cert_errors").prop("checked", true)
     $("#tenant_id, #client_id, #client_secret, #credentials_file").val("")
+    $("#sms_from, #sms_username, #sms_password").val("")
+    $("#sms_provider").val("twilio")
     showTransportFields("SMTP")
     $("#headersTable").dataTable().DataTable().clear().draw()
     $("#modal").modal('hide')
@@ -188,6 +202,13 @@ function edit(idx) {
         $("#client_id").val(profile.client_id || "")
         $("#client_secret").val(profile.client_secret || "")
         $("#credentials_file").val(profile.credentials_file || "")
+        $("#sms_provider").val(profile.sms_provider || "twilio")
+        $("#sms_from").val(profile.sms_from || "")
+        // SMS SID/token are stored in username/password.
+        if (profile.interface_type === "SMS") {
+            $("#sms_username").val(profile.username || "")
+            $("#sms_password").val(profile.password || "")
+        }
         showTransportFields(profile.interface_type || "SMTP")
         $.each(profile.headers, function (i, record) {
             addCustomHeader(record.key, record.value)

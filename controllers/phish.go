@@ -116,6 +116,10 @@ func (ps *PhishingServer) registerRoutes() {
 	router.HandleFunc("/{path:.*}/track", ps.TrackHandler)
 	router.HandleFunc("/{path:.*}/report", ps.ReportHandler)
 	router.HandleFunc("/report", ps.ReportHandler)
+	// Masked short link used by SMS lures: /l/<rid> serves the landing page
+	// directly, so the tracking id never appears as a ?rid= query parameter.
+	// Registered before the catch-all so it matches first.
+	router.HandleFunc("/l/{rid:[A-Za-z0-9]+}", ps.PhishHandler)
 	router.HandleFunc("/{path:.*}", ps.PhishHandler)
 
 	// Setup GZIP compression
@@ -138,6 +142,12 @@ func (ps *PhishingServer) registerRoutes() {
 
 // TrackHandler tracks emails as they are opened, updating the status for the given Result
 func (ps *PhishingServer) TrackHandler(w http.ResponseWriter, r *http.Request) {
+	// Don't record an open for an automated preview/scanner fetch; serve the
+	// tracking pixel so the request looks normal.
+	if isPreviewBot(r) {
+		http.ServeFileFS(w, r, static.FS, "images/pixel.png")
+		return
+	}
 	r, err := setupContext(r)
 	if err != nil {
 		// Log the error if it wasn't something we can safely ignore
@@ -206,6 +216,14 @@ func (ps *PhishingServer) ReportHandler(w http.ResponseWriter, r *http.Request) 
 // PhishHandler handles incoming client connections and registers the associated actions performed
 // (such as clicked link, etc.)
 func (ps *PhishingServer) PhishHandler(w http.ResponseWriter, r *http.Request) {
+	// An automated link-preview or URL scanner fetched the link (common with
+	// SMS/chat apps and email gateways). Serve a neutral placeholder and record
+	// nothing, so no false click is logged and no lure leaks into a preview
+	// card. The click is recorded only when a human actually opens the link.
+	if isPreviewBot(r) {
+		servePreviewPlaceholder(w)
+		return
+	}
 	r, err := setupContext(r)
 	if err != nil {
 		// Log the error if it wasn't something we can safely ignore
@@ -325,6 +343,11 @@ func setupContext(r *http.Request) (*http.Request, error) {
 		return r, err
 	}
 	rid := r.Form.Get(models.RecipientParameter)
+	if rid == "" {
+		// Fall back to a masked short link, where the rid is a path segment
+		// (/l/<rid>) rather than a query parameter.
+		rid = mux.Vars(r)["rid"]
+	}
 	if rid == "" {
 		return r, ErrInvalidRequest
 	}

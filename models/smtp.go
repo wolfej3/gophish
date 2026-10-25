@@ -54,6 +54,13 @@ type SMTP struct {
 	ClientID        string `json:"client_id,omitempty" gorm:"column:client_id"`
 	ClientSecret    string `json:"client_secret,omitempty" gorm:"column:client_secret"`
 	CredentialsFile string `json:"credentials_file,omitempty" gorm:"column:credentials_file"`
+
+	// The following are used by the SMS transport. SMSProvider selects the
+	// SMS API (e.g. "twilio"); SMSFrom is the sender phone number or ID. The
+	// provider credentials reuse Username (e.g. Twilio Account SID) and
+	// Password (e.g. Twilio Auth Token).
+	SMSProvider string `json:"sms_provider,omitempty" gorm:"column:sms_provider"`
+	SMSFrom     string `json:"sms_from,omitempty" gorm:"column:sms_from"`
 }
 
 // Sending profile interfaces (transports).
@@ -64,6 +71,15 @@ const (
 	GraphInterface = "Microsoft Graph"
 	// GmailInterface sends through the Gmail API.
 	GmailInterface = "Gmail"
+	// SMSInterface sends SMS text messages through an SMS provider API
+	// instead of email.
+	SMSInterface = "SMS"
+)
+
+// SMS providers supported by an SMS sending profile.
+const (
+	// SMSProviderTwilio sends through the Twilio REST API.
+	SMSProviderTwilio = "twilio"
 )
 
 // Header contains the fields and methods for a sending profile to have
@@ -103,8 +119,23 @@ var ErrGraphCredentials = errors.New("Microsoft Graph profiles need a tenant ID,
 // account credentials file.
 var ErrGmailCredentials = errors.New("Gmail profiles need a service account credentials file")
 
+// ErrSMSProviderNotSupported is thrown when an SMS profile names an unknown provider.
+var ErrSMSProviderNotSupported = errors.New("Unsupported SMS provider")
+
+// ErrSMSFromNotSpecified is thrown when an SMS profile has no sender number.
+var ErrSMSFromNotSpecified = errors.New("SMS profiles need a sender number (From)")
+
+// ErrSMSCredentials is thrown when an SMS profile is missing its API credentials.
+var ErrSMSCredentials = errors.New("SMS profiles need an account SID (Username) and auth token (Password)")
+
 // Validate ensures that SMTP configs/connections are valid
 func (s *SMTP) Validate() error {
+	// SMS profiles don't send email, so they're validated on their own terms
+	// (provider, sender number, and API credentials) rather than an email
+	// From address and host.
+	if s.Interface == SMSInterface {
+		return s.validateSMS()
+	}
 	if s.FromAddress == "" {
 		return ErrFromAddressNotSpecified
 	}
@@ -127,6 +158,20 @@ func (s *SMTP) Validate() error {
 		return nil
 	}
 	return s.validateSMTP()
+}
+
+// validateSMS validates an SMS sending profile.
+func (s *SMTP) validateSMS() error {
+	if s.SMSProvider != SMSProviderTwilio {
+		return ErrSMSProviderNotSupported
+	}
+	if s.SMSFrom == "" {
+		return ErrSMSFromNotSpecified
+	}
+	if s.Username == "" || s.Password == "" {
+		return ErrSMSCredentials
+	}
+	return nil
 }
 
 // validateSMTP validates the host for an SMTP sending profile.
@@ -157,6 +202,9 @@ func validateFromAddress(email string) bool {
 // transport from the profile's interface type.
 func (s *SMTP) GetDialer() (mailer.Dialer, error) {
 	switch s.Interface {
+	case SMSInterface:
+		// SMS profiles are sent through the SMS worker path, not the mailer.
+		return nil, errors.New("SMS profiles are not sent over the mail dialer")
 	case GraphInterface:
 		return sender.NewGraphDialer(sender.GraphConfig{
 			TenantID:     s.TenantID,

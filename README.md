@@ -20,6 +20,7 @@ This version modernizes Gophish and adds admin security features. The details ar
 - **Admin security:** two-factor authentication, single sign-on through OIDC or SAML, an audit log, and API keys with limited permissions.
 - **Teams and tenants:** objects are shared within teams instead of per login, teams nest under isolated client **tenants**, and a provider-admin role spans every tenant. Each user also gets a private Personal team. See [Teams](#teams) and [Tenants](#tenants).
 - **QR code lures:** email templates can embed a per-recipient QR code (`{{.QR}}`) that encodes the recipient's tracked link, to simulate "quishing". See [QR code lures](#qr-code-lures).
+- **SMS lures:** send the lure as a text message ("smishing") through an SMS provider (Twilio), with a masked short link and automatic suppression of link-preview/scanner false clicks. See [SMS lures](#sms-lures).
 
 #### Upgrading
 
@@ -203,6 +204,27 @@ Connectors go under `admin_server`:
 
 Setting a source or syncing takes the editor role on the group's team. Directory sync runs when you click **Sync Now**; scheduled syncing will come with the scheduling feature.
 
+### Template variables
+
+Email templates, landing pages, and SMS message text are Go templates. The
+following variables are available with `{{.Name}}` syntax:
+
+| Variable | Description |
+| --- | --- |
+| `{{.FirstName}}` | Recipient's first name |
+| `{{.LastName}}` | Recipient's last name |
+| `{{.Email}}` | Recipient's email address |
+| `{{.Position}}` | Recipient's position/title |
+| `{{.Phone}}` | Recipient's phone number (used by SMS campaigns) |
+| `{{.From}}` | The sending profile's display name / From |
+| `{{.URL}}` | The tracked phishing link for this recipient. In an **SMS** campaign this is the masked short link (see below) |
+| `{{.ShortURL}}` | The masked short link (`https://host/l/<id>`) that serves the landing page without a visible tracking parameter |
+| `{{.TrackingURL}}` | The URL of the open-tracking pixel |
+| `{{.Tracker}}` | An invisible `<img>` tag for the open-tracking pixel (email only) |
+| `{{.QR}}` | An inline `<img>` QR code encoding this recipient's tracked link (see [QR code lures](#qr-code-lures)) |
+| `{{.RId}}` | This recipient's unique result id |
+| `{{.BaseURL}}` | The scheme and host of the phishing server, e.g. `https://phish.example.com` |
+
 ### QR code lures
 
 Real phishing increasingly hides the link inside a QR code ("quishing"): the destination isn't a scannable `<a href>`, so it slips past URL filters, and the target scans it with a phone that's usually outside corporate protection. Gophish can simulate this.
@@ -214,6 +236,65 @@ Notes:
 - The QR is embedded as an inline image (`cid:`), not a `data:` URI, so it renders in Gmail and Outlook, which strip `data:` image sources.
 - A template without `{{.QR}}` is sent unchanged — no QR image is attached.
 - Opens may not register before the scan, since no tracking pixel is fetched until the recipient lands on the page.
+
+### SMS lures
+
+Gophish can send the lure as an SMS text message ("smishing") instead of email.
+The target gets a text with a link; tapping it lands on the phishing page and is
+tracked exactly like a click. SMS moves the interaction onto a phone, which is
+often outside corporate protection, and the link rides in plain text rather than
+an `<a href>` that a gateway can rewrite.
+
+#### Setting it up
+
+1. **Create an SMS sending profile.** Under **Sending Profiles**, add a profile
+   and set **Interface Type** to **SMS (Twilio)**. Enter the provider, the
+   **From number** (an SMS-capable number or messaging-service SID), and the
+   **Account SID** and **Auth Token**. The auth token is stored and redacted in
+   API responses like any other sending-profile secret.
+2. **Give recipients phone numbers.** Each target in a group has a **Phone**
+   field. You can type it in or include a `Phone` (or `Mobile`/`Cell`) column in
+   the CSV import. Numbers should be in E.164 form, e.g. `+15551234567`. Targets
+   still need an email address to be added to a group.
+3. **Write the message.** The email template's **text** content is used as the
+   SMS body. Put `{{.URL}}` where the link should go. Keep it short — SMS has no
+   subject, HTML, or attachments.
+4. **Launch a campaign** as usual, choosing the SMS sending profile. A landing
+   page is still required, since that's where the link goes and where clicks and
+   submitted data are recorded.
+
+#### Masked links
+
+In an SMS the whole URL is visible, so a raw `https://host/?rid=abc123` is an
+obvious tell. `{{.URL}}` in an SMS resolves to a **masked short link** of the
+form `https://host/l/<id>`, which serves the landing page directly — the
+tracking id never appears as a query parameter, even in the address bar. The
+same `{{.ShortURL}}` variable is available in email templates if you want a
+masked link there too.
+
+#### Link-preview and scanner suppression
+
+Messaging apps (iMessage, WhatsApp, Slack, …) and email-security gateways often
+**auto-fetch** a URL to render a preview or scan it. Gophish detects these
+automated fetches (by User-Agent and prefetch headers) and, for them, records
+**no** click or open and serves a blank, Open-Graph-free page. This prevents two
+problems: a false "Clicked" logged from a preview bot before the human taps, and
+a preview card that could reveal the test. The click is recorded only when a
+real person opens the link. This filtering also improves email campaign accuracy
+by ignoring security-scanner clicks. The filter is best-effort against a known
+list of preview/scanner agents; see `FUTURE_FEATURES.md` for making it
+configurable.
+
+#### Notes and limitations
+
+- **Opens don't apply to SMS** — there's no open-tracking pixel in a text, so an
+  SMS recipient moves straight from "sent" to "clicked".
+- **Phone numbers are required** for SMS recipients; a target with no phone is
+  recorded as a sending error and skipped.
+- **Provider:** Twilio is supported today, behind a small provider interface so
+  others can be added later.
+- **Testing:** set `GOPHISH_SMS_BASE_URL` to point the provider client at a
+  self-hosted gateway or a local mock instead of the real Twilio endpoint.
 
 ### Admin Security
 
