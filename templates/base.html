@@ -44,6 +44,20 @@
                 <a class="navbar-brand" href="/">&nbsp;gophish</a>
             </div>
             <div class="navbar-collapse collapse">
+                {{if .User}}
+                <form class="navbar-form navbar-left navbar-switcher" onsubmit="return false;">
+                    {{if .ManageTenants}}
+                    <div class="form-group hidden" id="tenantSwitcherGroup">
+                        <label for="tenantSwitcher">Tenant</label>
+                        <select id="tenantSwitcher" class="form-control input-sm"></select>
+                    </div>
+                    {{end}}
+                    <div class="form-group hidden" id="teamSwitcherGroup">
+                        <label for="teamSwitcher">Team</label>
+                        <select id="teamSwitcher" class="form-control input-sm"></select>
+                    </div>
+                </form>
+                {{end}}
                 <ul class="nav navbar-nav navbar-right">
                     <li>
                         {{if .User}}

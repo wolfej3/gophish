@@ -148,16 +148,27 @@ footer>p {
     color: #201e1c;
 }
 
-.sidebar-switcher {
-    padding: 10px 15px 0;
+.navbar-switcher .form-group {
+    margin-left: 15px;
+    margin-bottom: 0;
 }
 
-.sidebar-switcher .control-label {
-    margin-bottom: 3px;
+.navbar-switcher label {
+    margin-right: 6px;
     font-size: 11px;
     font-weight: 600;
+    letter-spacing: 0.3px;
     text-transform: uppercase;
-    color: #777;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.navbar-switcher select.form-control {
+    display: inline-block;
+    width: auto;
+    min-width: 130px;
+    height: 30px;
+    padding: 4px 8px;
+    font-size: 13px;
 }
 
 .api_heading {
