@@ -37,7 +37,7 @@
 </div>
 <!-- Modal -->
 <div class="modal fade" id="modal" tabindex="-1" role="dialog" aria-labelledby="modalLabel">
-    <div class="modal-dialog" role="document">
+    <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
@@ -93,29 +93,27 @@
                         <div class="small text-muted" id="directorySyncStatus" style="margin-top: 8px;"></div>
                     </div>
                 </div>
-                <div class="row">
-                    <form id="targetForm">
-                        <div class="col-sm-2">
-                            <input type="text" class="form-control" placeholder="First Name" id="firstName">
-                        </div>
-                        <div class="col-sm-2">
-                            <input type="text" class="form-control" placeholder="Last Name" id="lastName">
-                        </div>
-                        <div class="col-sm-3">
-                            <input type="email" class="form-control" placeholder="Email" id="email" required>
-                        </div>
-                        <div class="col-sm-2">
-                            <input type="text" class="form-control" placeholder="Phone (SMS)" id="phone">
-                        </div>
-                        <div class="col-sm-2">
-                            <input type="text" class="form-control" placeholder="Position" id="position">
-                        </div>
-                        <div class="col-sm-1">
-                            <button type="submit" class="btn btn-danger btn-lg">
-                                <i class="fa fa-plus"></i> Add</button>
-                        </div>
-                    </form>
-                </div>
+                <form id="targetForm" class="row target-form">
+                    <div class="form-group col-sm-6 col-md-2">
+                        <input type="text" class="form-control" placeholder="First Name" id="firstName">
+                    </div>
+                    <div class="form-group col-sm-6 col-md-2">
+                        <input type="text" class="form-control" placeholder="Last Name" id="lastName">
+                    </div>
+                    <div class="form-group col-sm-6 col-md-2">
+                        <input type="email" class="form-control" placeholder="Email" id="email" required>
+                    </div>
+                    <div class="form-group col-sm-6 col-md-2">
+                        <input type="text" class="form-control" placeholder="Phone (SMS)" id="phone">
+                    </div>
+                    <div class="form-group col-sm-6 col-md-2">
+                        <input type="text" class="form-control" placeholder="Position" id="position">
+                    </div>
+                    <div class="form-group col-sm-6 col-md-2">
+                        <button type="submit" class="btn btn-danger btn-block" title="Add user">
+                            <i class="fa fa-plus"></i> Add</button>
+                    </div>
+                </form>
                 <br />
                 <table id="targetsTable" class="table table-hover table-striped table-condensed">
                     <thead>

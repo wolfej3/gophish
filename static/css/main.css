@@ -212,7 +212,7 @@ p {
 }
 
 @media (min-width: 992px) {
-    .modal-dialog {
+    .modal-dialog:not(.modal-lg) {
         width: 700px;
     }
 }
