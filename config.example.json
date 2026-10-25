@@ -5,6 +5,7 @@
 		"cert_path": "gophish_admin.crt",
 		"key_path": "gophish_admin.key",
 		"trusted_origins": [],
+		"secure_cookies": true,
 		"trusted_proxies": [],
 		"allowed_internal_hosts": [],
 		"audit_log_retention_days": 0,

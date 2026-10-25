@@ -217,11 +217,11 @@ func (as *AdminServer) registerRoutes() {
 	}
 	csrfHandler := csrf.Protect(csrfKey,
 		csrf.FieldName("csrf_token"),
-		csrf.Secure(as.config.UseTLS),
+		csrf.Secure(as.config.CookiesSecure()),
 		csrf.TrustedOrigins(as.config.TrustedOrigins))
 	adminHandler := csrfHandler(router)
-	// Only send the session cookie over TLS when the admin server uses it
-	mid.Store.Options.Secure = as.config.UseTLS
+	// Only send the session cookie over HTTPS, unless secure_cookies is off
+	mid.Store.Options.Secure = as.config.CookiesSecure()
 	adminHandler = mid.Use(adminHandler.ServeHTTP, mid.CSRFExceptions, mid.GetContext, mid.ApplySecurityHeaders)
 
 	// Setup GZIP compression

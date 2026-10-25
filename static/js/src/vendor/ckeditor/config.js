@@ -60,6 +60,10 @@ CKEDITOR.editorConfig = function (config) {
 	// not needed in the Standard(s) toolbar.
 	config.removeButtons = 'Underline,Subscript,Superscript';
 
+	// The WebSpellChecker services these plugins use have shut down, and
+	// their resource folders have been removed.
+	config.removePlugins = 'wsc,scayt';
+
 	// Set the most common block elements.
 	config.format_tags = 'p;h1;h2;h3;pre';
 

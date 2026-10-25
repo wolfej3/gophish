@@ -62,7 +62,7 @@ The MySQL server needs the `sql_mode` described under [Database](#database).
 ### Docker
 This is a fork with additional security and feature changes (see [Security](#security)). The upstream `gophish/gophish` Docker image does not include these changes; build this fork's image yourself from the included `Dockerfile` (`docker build -t gophish .`). The Docker build compiles the admin assets with Go, so it no longer needs a Node.js stage.
 
-The `docker/run.sh` entrypoint maps environment variables into `config.json` at startup: `ADMIN_LISTEN_URL`, `ADMIN_USE_TLS`, `ADMIN_CERT_PATH`, `ADMIN_KEY_PATH`, `ADMIN_TRUSTED_ORIGINS`, `ADMIN_TRUSTED_PROXIES`, the `PHISH_*` equivalents, `CONTACT_ADDRESS`, `DB_NAME`, and `DB_FILE_PATH` (the `db_path` / DSN). Set `GOPHISH_INITIAL_ADMIN_PASSWORD` to choose the first-run admin password instead of reading it from the logs. Features configured by larger blocks (OIDC, SAML, directory connectors, the template library) aren't env-mapped — mount your own `config.json` over `/opt/gophish/config.json` for those.
+The `docker/run.sh` entrypoint maps environment variables into `config.json` at startup: `ADMIN_LISTEN_URL`, `ADMIN_USE_TLS`, `ADMIN_CERT_PATH`, `ADMIN_KEY_PATH`, `ADMIN_TRUSTED_ORIGINS`, `ADMIN_TRUSTED_PROXIES`, `ADMIN_SECURE_COOKIES`, the `PHISH_*` equivalents, `CONTACT_ADDRESS`, `DB_NAME`, and `DB_FILE_PATH` (the `db_path` / DSN). Set `GOPHISH_INITIAL_ADMIN_PASSWORD` to choose the first-run admin password instead of reading it from the logs. Features configured by larger blocks (OIDC, SAML, directory connectors, the template library) aren't env-mapped — mount your own `config.json` over `/opt/gophish/config.json` for those.
 
 #### Running with Docker Compose
 A ready-to-run stack (admin + phishing servers backed by MySQL) is included as `docker-compose.yml`:
@@ -118,6 +118,8 @@ There are two supported setups:
 - **Built-in TLS (the default).** Keep `"use_tls": true` in the `admin_server` section of `config.json`. Gophish generates a self-signed certificate on first run, or you can point `cert_path` and `key_path` at your own certificate.
 - **A TLS-terminating reverse proxy.** Set `"use_tls": false` and put a proxy such as nginx or Caddy in front of Gophish, serving the admin interface to browsers over HTTPS. Gophish logs a warning at startup when TLS is off as a reminder that it must sit behind such a proxy.
 
+Either way, the session and CSRF cookies are marked `Secure`, so browsers only send them over HTTPS. Set `"secure_cookies": false` only for a setup where browsers reach the admin interface over plain HTTP.
+
 If you access the admin interface through a different hostname than the one the request arrives with (for example, a proxy that rewrites the `Host` header), add the browser-facing host to `trusted_origins`. Entries are host names with an optional port and no scheme, e.g. `["gophish.example.com"]` or `["gophish.example.com:8443"]`. Only list hosts you control: the CSRF library doesn't check the scheme of trusted origins ([GO-2025-3884](https://pkg.go.dev/vuln/GO-2025-3884), no upstream fix yet), so each entry should only ever serve Gophish over HTTPS.
 
 In Docker, the admin server uses built-in TLS unless `ADMIN_USE_TLS=false` is set.
@@ -162,6 +164,7 @@ Gophish reads a single JSON file (`config.json` by default, or the path passed w
 | `listen_url` | `127.0.0.1:3333` | Address the admin interface listens on. |
 | `use_tls` | `true` | Serve built-in TLS. Required unless a proxy terminates TLS — see [Admin Server TLS](#admin-server-tls). |
 | `cert_path` / `key_path` | `gophish_admin.crt` / `.key` | TLS cert/key; self-signed on first run if absent. |
+| `secure_cookies` | `true` | Mark the session and CSRF cookies `Secure`, even when `use_tls` is off. |
 | `trusted_origins` | `[]` | Extra browser-facing hosts (`host[:port]`) accepted by CSRF when behind a host-rewriting proxy. |
 | `trusted_proxies` | `[]` | CIDRs/IPs of proxies whose forwarded-for headers are trusted. See [Reverse proxies](#reverse-proxies-and-client-ips). |
 | `allowed_internal_hosts` | `[]` | Internal hosts server-side fetches (Import Site, webhooks) may reach; otherwise internal/loopback/metadata addresses are blocked. |

@@ -19,6 +19,11 @@ type AdminServer struct {
 	CSRFKey              string   `json:"csrf_key"`
 	AllowedInternalHosts []string `json:"allowed_internal_hosts"`
 	TrustedOrigins       []string `json:"trusted_origins"`
+	// SecureCookies marks the session and CSRF cookies Secure, so browsers
+	// only send them over HTTPS. Nil (the default) means true, even when
+	// use_tls is off, since the admin server is then expected to sit behind a
+	// TLS-terminating proxy.
+	SecureCookies *bool `json:"secure_cookies"`
 	// TrustedProxies lists CIDRs (or bare IPs) of reverse proxies whose
 	// X-Forwarded-For / X-Real-IP headers may be trusted. Empty trusts no
 	// proxy headers, so the direct peer is always used.
@@ -34,6 +39,12 @@ type AdminServer struct {
 	// days, pruned at startup and once a day after. Zero (the default) keeps
 	// entries forever.
 	AuditLogRetentionDays int `json:"audit_log_retention_days"`
+}
+
+// CookiesSecure reports whether the admin server's cookies should be marked
+// Secure.
+func (as AdminServer) CookiesSecure() bool {
+	return as.SecureCookies == nil || *as.SecureCookies
 }
 
 // TemplateLibrary configures a git repository that serves as a shared,

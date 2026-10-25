@@ -74,3 +74,22 @@ func TestLoadConfig(t *testing.T) {
 		t.Fatalf("expected error when loading invalid config, but got %v", err)
 	}
 }
+
+func TestCookiesSecure(t *testing.T) {
+	off, on := false, true
+	tests := []struct {
+		name   string
+		config AdminServer
+		want   bool
+	}{
+		{"unset with TLS", AdminServer{UseTLS: true}, true},
+		{"unset without TLS", AdminServer{UseTLS: false}, true},
+		{"explicitly on", AdminServer{SecureCookies: &on}, true},
+		{"explicitly off", AdminServer{UseTLS: true, SecureCookies: &off}, false},
+	}
+	for _, tc := range tests {
+		if got := tc.config.CookiesSecure(); got != tc.want {
+			t.Errorf("%s: got %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}

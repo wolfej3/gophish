@@ -31,6 +31,12 @@ if [ -n "${ADMIN_TRUSTED_ORIGINS+set}" ] ; then
         '.admin_server.trusted_origins = ($ADMIN_TRUSTED_ORIGINS|split(","))' config.json > config.json.tmp && \
         cat config.json.tmp > config.json
 fi
+if [ -n "${ADMIN_SECURE_COOKIES+set}" ] ; then
+    jq -r \
+        --argjson ADMIN_SECURE_COOKIES "${ADMIN_SECURE_COOKIES}" \
+        '.admin_server.secure_cookies = $ADMIN_SECURE_COOKIES' config.json > config.json.tmp && \
+        cat config.json.tmp > config.json
+fi
 if [ -n "${ADMIN_TRUSTED_PROXIES+set}" ] ; then
     jq -r \
         --arg ADMIN_TRUSTED_PROXIES "${ADMIN_TRUSTED_PROXIES}" \
