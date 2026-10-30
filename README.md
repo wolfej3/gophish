@@ -402,6 +402,76 @@ configurable.
 - **Testing:** set `GOPHISH_SMS_BASE_URL` to point the provider client at a
   self-hosted gateway or a local mock instead of the real Twilio endpoint.
 
+### MCP server
+
+Gophish can expose itself to AI assistants and agents (Claude Desktop, MCP
+Inspector, and other [Model Context Protocol](https://modelcontextprotocol.io)
+clients) through a `gophish mcp` subcommand. The agent can then list and build
+campaigns, launch them, and read results through a standard tool interface.
+
+The subcommand is a **client of a running Gophish instance**, not a new server:
+it speaks MCP over stdio and translates each tool call into a request against
+the existing admin REST API over HTTP. It does not read `config.json`, open the
+database, or open any network port of its own.
+
+**The API key is the permission boundary.** Every tool call carries the key you
+provide, so the key's permissions, scope, team, tenant, and the view-only rule
+are enforced by the server exactly as for any other API caller — a read-only or
+scoped key yields a read-only or limited set of tools with no extra
+configuration. The MCP layer adds no enforcement of its own.
+
+#### Running it
+
+1. In the admin UI, create an API key (**Account Settings** → API key, or a
+   scoped key under **User Management**). Scope or mark it read-only to limit
+   what the agent can do.
+2. Run the subcommand, passing the key in the `GOPHISH_MCP_API_KEY`
+   environment variable (it is read from the environment, not a flag, so it
+   stays out of the process list):
+
+   ```
+   GOPHISH_MCP_API_KEY=gpk_… gophish mcp --url https://your-host:3333 --insecure
+   ```
+
+   - `--url` — base URL of the running admin server (default
+     `https://localhost:3333`).
+   - `--team` — optional default team id to act within; each tool also accepts a
+     `team_id` to override it per call.
+   - `--insecure` — skip TLS verification, for the self-signed certificate the
+     admin server uses by default. Drop it once you have a trusted certificate.
+
+#### Claude Desktop configuration
+
+Add an entry to the `mcpServers` block of your Claude Desktop config:
+
+```json
+{
+  "mcpServers": {
+    "gophish": {
+      "command": "/path/to/gophish",
+      "args": ["mcp", "--url", "https://your-host:3333", "--insecure"],
+      "env": { "GOPHISH_MCP_API_KEY": "gpk_…" }
+    }
+  }
+}
+```
+
+#### Tools
+
+- **Campaigns:** `list_campaigns`, `get_campaigns_summary`, `get_campaign`,
+  `get_campaign_results`, `get_campaign_summary`, `create_campaign` (creates and
+  launches), `complete_campaign`, `delete_campaign`.
+- **Building blocks:** `list_templates`/`get_template`/`create_template`,
+  `list_pages`/`get_page`/`create_page`,
+  `list_groups`/`get_group`/`create_group`, and
+  `list_sending_profiles`/`get_sending_profile` (sending profiles carry secrets
+  and transport config and are set up in the UI, so they are read-only here).
+- **Recon:** `list_people`, `get_person`, `list_teams`, and `list_tenants`
+  (`list_tenants` succeeds only for a provider-admin key).
+
+`create_campaign` references an existing template, page, sending profile, and
+groups by name, so assemble those first (in the UI or with the create tools).
+
 ### Admin Security
 
 #### Sessions

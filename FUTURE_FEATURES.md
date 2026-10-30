@@ -6,11 +6,11 @@ here need a go-ahead before they're built. For checks that still need to run on
 already-merged work, see `VERIFICATION_PENDING.md`.
 
 **Active roadmap (set 2026-10-30).** Build order: **(1) Gmail DMI — shipped,
-(2) MCP server endpoint, (3) credential encryption at rest.** Also back on the
-roadmap after being deferred from phase 4: **MFA / 2FA lures** and **follow-up
-training** (the training design will be driven by the product owner — don't
-design it ahead of their input). Postgres remains out of scope (tenants are
-built on MySQL).
+(2) MCP server endpoint — shipped, (3) credential encryption at rest.** Also
+back on the roadmap after being deferred from phase 4: **MFA / 2FA lures** and
+**follow-up training** (the training design will be driven by the product owner
+— don't design it ahead of their input). Postgres remains out of scope (tenants
+are built on MySQL).
 
 ## Lures
 
@@ -211,11 +211,22 @@ the one-time vendoring of CodeMirror.
 
 ## AI / automation
 
-### MCP server endpoint (`gophish mcp`)
+### MCP server endpoint (`gophish mcp`) — SHIPPED 2026-10-30
 Expose Gophish over the **Model Context Protocol** so AI agents/assistants
 (Claude Desktop, etc.) can drive it — list and build campaigns, launch them, read
 results — through a standard tool interface. This was phase 4 item 11; planned in
 detail, then tabled before implementation.
+
+**Shipped** as designed below: the `gophish mcp` stdio subcommand in the
+`mcpserver/` package (`client.go` REST client, `server.go` entry point,
+`tools.go` curated toolset), dispatched from `gophish.go` before kingpin parses.
+Dependency `github.com/modelcontextprotocol/go-sdk/mcp` v1.8.0. Tests stub the
+REST client via an `http.RoundTripper` and exercise tools end-to-end over the
+SDK's in-memory transport (headers/path/body, non-2xx→error, passthrough, and
+the key-is-the-boundary case). Documented in the README "MCP server" section.
+The original plan is kept below for reference. Not yet done: the live
+end-to-end check against a running server with Claude Desktop / MCP Inspector,
+including confirming a read-only scoped key makes the write tools fail.
 
 **Decisions already made (with the user):**
 - **Transport: a `gophish mcp` stdio subcommand**, not an HTTP endpoint on the

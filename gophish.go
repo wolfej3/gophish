@@ -39,6 +39,7 @@ import (
 	"github.com/gophish/gophish/dialer"
 	"github.com/gophish/gophish/imap"
 	log "github.com/gophish/gophish/logger"
+	"github.com/gophish/gophish/mcpserver"
 	"github.com/gophish/gophish/middleware"
 	"github.com/gophish/gophish/models"
 	"github.com/gophish/gophish/webhook"
@@ -63,6 +64,18 @@ var (
 var version string
 
 func main() {
+	// The `gophish mcp` subcommand runs a Model Context Protocol server that
+	// adapts to the REST API of a running Gophish instance. It is a client,
+	// not a server: it must not load config.json, open the database, or start
+	// the admin/phishing servers, so dispatch it before kingpin parses the
+	// server flags. `gophish` with no subcommand behaves exactly as before.
+	if len(os.Args) > 1 && os.Args[1] == "mcp" {
+		if err := mcpserver.Run(version, os.Args[2:]); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
 	kingpin.Version(version)
 
 	// Parse the CLI flags and load the config
