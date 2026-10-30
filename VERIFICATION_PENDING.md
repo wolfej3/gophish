@@ -1,68 +1,61 @@
-# Verification pending
+# Verification log
 
-Checks that still need to be run on a machine with Docker and local port
-binding (they couldn't run in the sandboxed dev environment where this was
-built — the Docker control socket and local `listen`/`bind` are both denied).
+These checks originally couldn't run in the sandboxed dev environment (the
+Docker control socket and local `listen`/`bind` were denied). They were run on
+a Docker-capable machine on **2026-10-30** and all passed. Details below.
 
-## Tenants feature (phase 4 #8, commit `a34de19`)
+## Tenants feature (phase 4 #8, commit `a34de19`) — VERIFIED 2026-10-30
 
-Already verified: `gofmt -l .` clean, `go build ./...`, `go vet ./...`, and the
-full **SQLite** test suite (`go test ./...`) — the new tenants migration runs
-during test setup, and `models/tenant_test.go` plus the updated team/user/
-person/scope tests pass.
+- `gofmt -l .` clean, `go build ./...`, `go vet ./...`, full **SQLite** suite: pass.
+- **MySQL suite** — `mysql:8.4.6` on `:3307`, `sql_mode` cleared, then
+  `GOPHISH_TEST_MYSQL_DSN='root:…@(127.0.0.1:3307)/gophish_test?charset=utf8&parseTime=True&loc=UTC' go test -p 1 ./...`:
+  **all packages pass, 0 failures**, including the port-binding `controllers`,
+  `controllers/api`, and `models` packages. The hand-written MySQL tenants
+  migration runs during setup and `models/tenant_test.go` passes.
+- **Migration down→up** against MySQL (goose v3.29.0, `db/db_mysql/migrations`):
+  `up-to 20261105000000` created the `tenants` table + `tenant_id` on
+  `teams`/`users`; `down` dropped them cleanly; `up` re-applied. Rollback SQL is
+  correct.
+- **Fresh-DB seeding** (checked directly in MySQL): first admin is
+  `provider_admin` (role id 3), a Default tenant (id 1) and Default team (id 1)
+  exist, and the admin's auto-created **Personal #1** team is present
+  (`owner_user_id = 1`).
 
-Still to run:
+Remaining (UI-only, low risk): the hands-on multi-tenant *isolation* walkthrough
+(create two tenants each with a tenant admin; confirm each tenant admin sees only
+their own tenant's teams/users; a peer can't see another's personal team; the
+default-team selector saves). The provider-admin view, tenant switcher, and
+seeding were spot-checked in the browser; the underlying authorization logic is
+covered by passing tests (`tenant_test.go`, the api-package
+`TestTenantAdminCannotTouchProviderAdmin` / impersonation tests, and the scope
+tests), all green on MySQL.
 
-1. **MySQL tests** — exercises the hand-written MySQL migration
-   (`db/db_mysql/migrations/20261105000000_0.15.0_tenants.sql`), which is the
-   main untested piece.
+## Docker Compose stack (phase 4 #12) — VERIFIED 2026-10-30
 
-   ```bash
-   docker run --rm -e MYSQL_ROOT_PASSWORD=gophish-test -e MYSQL_DATABASE=gophish_test -p 3307:3306 mysql:8.4.6
-   ```
+- `docker compose config` parses the base file and the base+proxy overlay.
+- `docker compose up -d --build`: image builds, MySQL comes up healthy, gophish
+  migrates **to the latest version (`20261106000000`)** into MySQL — the
+  `gophish` database holds 30 tables (`tenants`, `teams`, `sessions`,
+  `audit_logs`, `goose_db_version`, …).
+- **Login**: logged in as `admin` over the self-signed HTTPS admin server; the
+  first-login forced password reset works.
+- **MySQL persistence**: after `docker compose restart`, all tables, the admin
+  user, and the Default tenant/teams survive (data lives in the `db_data`
+  volume); no duplicate re-seed. The browser password reset also persisted.
+- **Reverse-proxy overlay**
+  (`docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d`):
+  gophish drops to `http://:3333` (`ADMIN_USE_TLS=false`), Caddy terminates TLS
+  on `:443` with its local CA (`CN=Caddy Local Authority`), and the admin login
+  page is reachable through Caddy over HTTPS (200). CSRF accepts a proxied login
+  via `ADMIN_TRUSTED_ORIGINS` (the POST reached the auth check rather than being
+  rejected as a cross-origin request).
 
-   Then (after setting `sql_mode` to drop `NO_ZERO_DATE`):
+## Note observed during verification (not a blocker)
 
-   ```bash
-   GOPHISH_TEST_MYSQL_DSN='root:gophish-test@(127.0.0.1:3307)/gophish_test?charset=utf8&parseTime=True&loc=UTC' go test -p 1 ./...
-   ```
-
-   Also worth a manual check: run the migration **down** then **up** against
-   MySQL to confirm the rollback SQL is correct (tests only exercise `up`).
-
-2. **Browser check** — via the local HTTP→HTTPS proxy (admin needs TLS). Verify:
-   - Provider admin sees the **Tenants** page, the tenant switcher, and tenant
-     columns on Teams/Users; can create/rename/delete a tenant.
-   - Create two tenants with a tenant admin each; confirm each tenant admin sees
-     only their own tenant's teams/users and the team switcher lists only
-     in-tenant teams.
-   - A regular user has a **Personal** team in the switcher and can't see a
-     peer's personal team; a tenant admin can.
-   - Default-team selector in Account Settings saves and takes effect on sign-in.
-   - Fresh DB: first admin is `provider_admin`; a Default tenant/team exist.
-
-Note: 5 pre-existing tests (`sender`, `webhook`, `directory`, and two in
-`controllers`) use `httptest` servers and also need local port binding; they
-fail only in the sandbox, not in CI.
-
-## Docker Compose stack (phase 4 #12)
-
-Already verified: `docker compose config` parses both the base file and the
-base+proxy overlay; `config.example.json` is valid JSON and loads in gophish
-(it starts, connects to SQLite, and runs all migrations, failing only at the
-sandbox-blocked port bind).
-
-Still to run (needs Docker):
-
-```bash
-cp .env.example .env      # edit the passwords
-docker compose up -d --build
-```
-
-- Browse https://localhost:3333, accept the self-signed cert, log in as `admin`
-  with `GOPHISH_INITIAL_ADMIN_PASSWORD`.
-- Confirm MySQL is in use: data survives `docker compose restart`, and the
-  `gophish` database has tables.
-- Reverse-proxy overlay: `docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d --build`,
-  then confirm the admin UI is reachable through Caddy over HTTPS with
-  gophish's own `use_tls` off.
+On the admin login **error paths** (CSRF reject, bad password) over the direct
+self-signed HTTPS server, the gorilla access logger reports a `superfluous
+response.WriteHeader call`, and a raw curl client can receive a `500` while the
+access log records the correct status (403/401). A real browser logs in fine
+(confirmed), and the proxied path doesn't exhibit it. Worth a small follow-up to
+find the double `WriteHeader` on the login/CSRF error path, but it does not
+affect normal use.

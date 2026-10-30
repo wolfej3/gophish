@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	ctx "github.com/gophish/gophish/context"
@@ -229,5 +230,28 @@ func TestApplySecurityHeaders(t *testing.T) {
 		if got != value {
 			t.Fatalf("incorrect security header received for %s: expected %s got %s", header, value, got)
 		}
+	}
+}
+
+// TestGetContextParseFormError ensures that when the request form can't be
+// parsed, GetContext responds with a single 500 and does not fall through to
+// the wrapped handler (which would write the response a second time).
+func TestGetContextParseFormError(t *testing.T) {
+	setupTest(t)
+	called := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.Write([]byte("should not run"))
+	})
+	// An invalid percent-escape in the urlencoded body makes ParseForm fail.
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("%zz=1"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	response := httptest.NewRecorder()
+	GetContext(next).ServeHTTP(response, req)
+	if response.Code != http.StatusInternalServerError {
+		t.Fatalf("expected status %d, got %d", http.StatusInternalServerError, response.Code)
+	}
+	if called {
+		t.Fatalf("wrapped handler ran after a form-parse error; response was written twice")
 	}
 }
