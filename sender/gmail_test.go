@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -75,6 +76,82 @@ func TestGmailSend(t *testing.T) {
 	}
 	if !strings.Contains(string(mime), "Subject: Hello") {
 		t.Fatalf("MIME didn't contain the message: %s", mime)
+	}
+}
+
+func TestGmailInsert(t *testing.T) {
+	var inserts int
+	var gotRaw string
+	var gotLabels []string
+	subjects := map[string]bool{}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
+		// The delegated subject (the recipient, in insert mode) is carried
+		// in the signed JWT assertion's claim set. Decode it so we can
+		// confirm a per-recipient client is minted.
+		if assertion := r.FormValue("assertion"); assertion != "" {
+			parts := strings.Split(assertion, ".")
+			if len(parts) == 3 {
+				if payload, err := base64.RawURLEncoding.DecodeString(parts[1]); err == nil {
+					claims := map[string]interface{}{}
+					json.Unmarshal(payload, &claims)
+					for _, key := range []string{"sub", "prn"} {
+						if v, ok := claims[key].(string); ok && v != "" {
+							subjects[v] = true
+						}
+					}
+				}
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{"access_token": "tok", "token_type": "Bearer", "expires_in": 3600})
+	})
+	mux.HandleFunc("/users/me/messages/insert", func(w http.ResponseWriter, r *http.Request) {
+		inserts++
+		body := struct {
+			Raw      string   `json:"raw"`
+			LabelIds []string `json:"labelIds"`
+		}{}
+		json.NewDecoder(r.Body).Decode(&body)
+		gotRaw = body.Raw
+		gotLabels = body.LabelIds
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"id": "123"})
+	})
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	dialer, err := NewGmailDialer(GmailConfig{
+		CredentialsFile: writeServiceAccount(t, server.URL+"/token"),
+		From:            "sender@example.com", Insert: true, BaseURL: server.URL,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	sender, _ := dialer.Dial()
+	recipients := []string{"alice@example.com", "bob@example.com"}
+	if err := sender.Send("sender@example.com", recipients, testMessage(t)); err != nil {
+		t.Fatalf("send failed: %v", err)
+	}
+	if inserts != len(recipients) {
+		t.Fatalf("expected %d inserts, got %d", len(recipients), inserts)
+	}
+	if want := []string{"INBOX", "UNREAD"}; !reflect.DeepEqual(gotLabels, want) {
+		t.Fatalf("expected labelIds %v, got %v", want, gotLabels)
+	}
+	mime, err := base64.URLEncoding.DecodeString(gotRaw)
+	if err != nil {
+		t.Fatalf("raw wasn't base64url MIME: %v", err)
+	}
+	if !strings.Contains(string(mime), "Subject: Hello") {
+		t.Fatalf("MIME didn't contain the message: %s", mime)
+	}
+	// A client must be minted per recipient, with the recipient as the
+	// delegated subject.
+	for _, r := range recipients {
+		if !subjects[r] {
+			t.Fatalf("recipient %q was not used as a delegated subject (saw %v)", r, subjects)
+		}
 	}
 }
 

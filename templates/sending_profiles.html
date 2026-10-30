@@ -89,6 +89,12 @@
                             <p class="help-block small">A service account with domain-wide delegation for the <code>gmail.send</code> scope. The From address above is the Workspace user to send as.</p>
                             <label class="control-label" for="credentials_file">Service account credentials file:</label>
                             <input type="text" class="form-control" id="credentials_file" placeholder="/etc/gophish/google-sa.json" />
+                            <div class="checkbox">
+                                <label>
+                                    <input type="checkbox" id="gmail_insert" /> Deliver by direct inbox injection (DMI)
+                                </label>
+                            </div>
+                            <p class="help-block small">Writes the lure straight into each recipient's mailbox with the Gmail API (<code>messages.insert</code>), bypassing delivery and spam filtering. Requires domain-wide delegation for the <code>gmail.insert</code> scope over the <strong>recipients'</strong> mailboxes (not the From address). For authorized internal Google Workspace tests only.</p>
                         </div>
                         <!-- SMS fields -->
                         <div class="transport-sms hidden">

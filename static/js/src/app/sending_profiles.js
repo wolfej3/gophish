@@ -84,6 +84,7 @@ function save(idx) {
     profile.client_id = $("#client_id").val()
     profile.client_secret = $("#client_secret").val()
     profile.credentials_file = $("#credentials_file").val()
+    profile.gmail_insert = $("#gmail_insert").prop("checked")
     // SMS profiles reuse username/password for the provider's SID/token.
     if (profile.interface_type === "SMS") {
         profile.sms_provider = $("#sms_provider").val()
@@ -126,6 +127,7 @@ function dismiss() {
     $("#password").val("")
     $("#ignore_cert_errors").prop("checked", true)
     $("#tenant_id, #client_id, #client_secret, #credentials_file").val("")
+    $("#gmail_insert").prop("checked", false)
     $("#sms_from, #sms_username, #sms_password").val("")
     $("#sms_provider").val("twilio")
     showTransportFields("SMTP")
@@ -202,6 +204,7 @@ function edit(idx) {
         $("#client_id").val(profile.client_id || "")
         $("#client_secret").val(profile.client_secret || "")
         $("#credentials_file").val(profile.credentials_file || "")
+        $("#gmail_insert").prop("checked", profile.gmail_insert || false)
         $("#sms_provider").val(profile.sms_provider || "twilio")
         $("#sms_from").val(profile.sms_from || "")
         // SMS SID/token are stored in username/password.
@@ -232,6 +235,7 @@ function copy(idx) {
     $("#username").val(profile.username)
     $("#password").val(profile.password)
     $("#ignore_cert_errors").prop("checked", profile.ignore_cert_errors)
+    $("#gmail_insert").prop("checked", profile.gmail_insert || false)
 }
 
 function load() {

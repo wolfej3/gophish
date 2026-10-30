@@ -250,6 +250,18 @@ A sending profile's **interface type** chooses how it sends, for environments wh
 
 For both API transports the message is the same one the SMTP path builds, so templates, tracking, and the rest of a campaign work unchanged. Their credentials are stored on the sending profile, like the existing SMTP password. Secrets (SMTP/IMAP passwords, the Graph client secret) are never returned in API responses — they show as a placeholder you can leave unchanged to keep the stored value.
 
+#### Gmail direct inbox injection (DMI)
+
+A Gmail sending profile has an optional **Deliver by direct inbox injection (DMI)** mode. Instead of *delivering* the lure (`messages.send`), gophish writes it straight into each recipient's mailbox with the Gmail API's `messages.insert`, labelled `INBOX`/`UNREAD`. The message never travels the normal delivery path, so it bypasses spam filtering and gateway rules — the test measures what your users do, not what your mail stack caught. This is intended **only for authorized internal Google Workspace phishing simulations.**
+
+Because `insert` writes into a mailbox rather than sending as someone, it impersonates the **recipient**, not the From address. So:
+
+- The service account needs domain-wide delegation for the **`https://www.googleapis.com/auth/gmail.insert`** scope, authorized over the **recipients'** mailboxes (the same Workspace). No delegation is needed over the *Send as* address in this mode — it is used only as the lure's `From:` header.
+- Every recipient must be a mailbox in that Workspace.
+- Tracking, the QR lure, and everything else are already baked into the MIME, so they work unchanged.
+
+Enable it with the checkbox on the Gmail sending profile (or set `"gmail_insert": true` on the profile via the API). Leave it off for ordinary Gmail delivery.
+
 ### People
 
 The **People** page shows everyone who has been in a campaign in the current team and how they've responded across all of them, rather than one campaign at a time. For each recipient it shows how many campaigns they were in and in how many they opened the email, clicked, submitted data, or reported it. The counts are per campaign, so clicking twice in one campaign counts once. Opening a person shows their full history — the furthest status reached in each campaign — and a single timeline of their events across every campaign.

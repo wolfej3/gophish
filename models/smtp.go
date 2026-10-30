@@ -54,6 +54,11 @@ type SMTP struct {
 	ClientID        string `json:"client_id,omitempty" gorm:"column:client_id"`
 	ClientSecret    string `json:"client_secret,omitempty" gorm:"column:client_secret"`
 	CredentialsFile string `json:"credentials_file,omitempty" gorm:"column:credentials_file"`
+	// GmailInsert selects the Gmail "direct inbox injection" (DMI) delivery
+	// mode: the lure is written straight into each recipient's mailbox with
+	// gmail.insert instead of being delivered with messages.send. Only used
+	// by the Gmail transport, for authorized internal Workspace tests.
+	GmailInsert bool `json:"gmail_insert" gorm:"column:gmail_insert"`
 
 	// The following are used by the SMS transport. SMSProvider selects the
 	// SMS API (e.g. "twilio"); SMSFrom is the sender phone number or ID. The
@@ -216,6 +221,7 @@ func (s *SMTP) GetDialer() (mailer.Dialer, error) {
 		return sender.NewGmailDialer(sender.GmailConfig{
 			CredentialsFile: s.CredentialsFile,
 			From:            s.FromAddress,
+			Insert:          s.GmailInsert,
 		})
 	}
 	// Setup the message and dial

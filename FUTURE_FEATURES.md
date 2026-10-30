@@ -1,9 +1,16 @@
 # Future features
 
 A living backlog of features and enhancements that have been discussed and
-intentionally deferred, with enough context to pick each up later. Nothing here
-is committed work — each needs a go-ahead before it's built. For checks that
-still need to run on already-merged work, see `VERIFICATION_PENDING.md`.
+intentionally deferred, with enough context to pick each up later. Most items
+here need a go-ahead before they're built. For checks that still need to run on
+already-merged work, see `VERIFICATION_PENDING.md`.
+
+**Active roadmap (set 2026-10-30).** Build order: **(1) Gmail DMI — shipped,
+(2) MCP server endpoint, (3) credential encryption at rest.** Also back on the
+roadmap after being deferred from phase 4: **MFA / 2FA lures** and **follow-up
+training** (the training design will be driven by the product owner — don't
+design it ahead of their input). Postgres remains out of scope (tenants are
+built on MySQL).
 
 ## Lures
 
@@ -52,7 +59,17 @@ The SMS channel ships with Twilio behind a small provider interface. Additional
 providers (Vonage/Nexmo, AWS SNS, MessageBird, Telnyx, …) can be added as new
 implementations of that interface without touching the send pipeline.
 
-### Gmail direct inbox injection (DMI)
+### Gmail direct inbox injection (DMI) — SHIPPED 2026-10-30
+
+**Done.** Model field `gmail_insert` on `SMTP` + dual migration
+`20261107000000_0.16.0_gmail_insert.sql`; `GmailConfig.Insert` and the
+`gmailInsertSender` (`messages.insert`, `gmail.insert` scope, per-recipient
+delegated subject, `labelIds: ["INBOX","UNREAD"]`) in `sender/gmail.go`;
+`GetDialer` wiring; a "Deliver by direct inbox injection (DMI)" checkbox on the
+Gmail sending profile; `TestGmailInsert`. Documented in the README under
+*Gmail direct inbox injection (DMI)*. The original design is kept below for
+reference.
+
 Confirmed with the user: "DMI" = **direct mailbox injection** — for authorized
 internal Google Workspace simulations, drop the lure straight into the target's
 Gmail inbox via the Gmail API instead of delivering over SMTP/`messages.send`. It
@@ -112,12 +129,16 @@ over the test recipients. The full plan above can be executed as written.
 
 ### MFA / 2FA lures
 Simulate real-time credential-plus-OTP capture (e.g. an attacker-in-the-middle
-style flow) rather than only static credential capture. Deferred from phase 4.
+style flow) rather than only static credential capture. Deferred from phase 4,
+**back on the active roadmap (2026-10-30)** — to be built after the MCP endpoint
+and credential encryption at rest.
 
 ### Follow-up training
 After a target interacts with a lure, deliver a short training page/module and
 record completion, so a campaign can both test and educate. Deferred from
-phase 4.
+phase 4, **back on the active roadmap (2026-10-30)**. The product owner will
+drive the training design and has significant ideas for this area, so hold on a
+detailed design until that input lands.
 
 ## Security / maintenance
 
