@@ -25,6 +25,8 @@
 	"db_path": "gophish.db",
 	"db_sslca_path": "",
 	"contact_address": "",
+	"encryption_key": "",
+	"encryption_key_file": "",
 	"logging": {
 		"filename": "",
 		"level": ""

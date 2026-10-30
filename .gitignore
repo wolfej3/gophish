@@ -30,5 +30,8 @@ gophish_admin.key
 gophish.db*
 gophish
 
+# Credential encryption key (generated next to config.json)
+encryption.key
+
 # Local docker-compose secrets
 .env

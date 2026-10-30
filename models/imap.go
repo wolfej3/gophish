@@ -19,7 +19,7 @@ type IMAP struct {
 	Host                        string    `json:"host"`
 	Port                        uint16    `json:"port,string,omitempty"`
 	Username                    string    `json:"username"`
-	Password                    string    `json:"password"`
+	Password                    string    `json:"password" gorm:"serializer:secret"`
 	TLS                         bool      `json:"tls"`
 	IgnoreCertErrors            bool      `json:"ignore_cert_errors"`
 	Folder                      string    `json:"folder"`

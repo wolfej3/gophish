@@ -193,6 +193,12 @@ func Setup(c *config.Config) error {
 		log.Error(err)
 		return err
 	}
+	// Configure credential encryption at rest, then upgrade any plaintext
+	// secrets already in the database to the encrypted form.
+	if err = setupEncryption(); err != nil {
+		log.Error(err)
+		return err
+	}
 	// Clean up any sessions that expired while Gophish wasn't running
 	err = DeleteExpiredSessions()
 	if err != nil {

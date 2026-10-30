@@ -215,6 +215,19 @@ type Config struct {
 	TestFlag       bool        `json:"test_flag"`
 	ContactAddress string      `json:"contact_address"`
 	Logging        *log.Config `json:"logging"`
+	// EncryptionKey is a base64-encoded 16/24/32-byte AES key used to encrypt
+	// secret columns (sending-profile and IMAP passwords, Microsoft Graph
+	// client secret) at rest. Prefer EncryptionKeyFile or the
+	// GOPHISH_ENCRYPTION_KEY environment variable over setting the key inline
+	// here. When none of these is set, a key file is generated next to
+	// config.json on first run.
+	EncryptionKey string `json:"encryption_key"`
+	// EncryptionKeyFile is a path to a file containing the base64 AES key.
+	EncryptionKeyFile string `json:"encryption_key_file"`
+	// ConfigPath is the path config.json was loaded from. It is not read from
+	// the JSON; LoadConfig sets it so the default encryption key file can be
+	// placed alongside the config.
+	ConfigPath string `json:"-"`
 }
 
 // ParseTrustedProxies parses a list of CIDR strings (or bare IPs, treated as
@@ -268,5 +281,6 @@ func LoadConfig(configPath string) (*Config, error) {
 	}
 	// Explicitly set the TestFlag to false to prevent config.json overrides
 	config.TestFlag = false
+	config.ConfigPath = configPath
 	return config, nil
 }

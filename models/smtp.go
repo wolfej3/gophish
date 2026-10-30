@@ -36,12 +36,14 @@ type SMTP struct {
 	Id     int64 `json:"id" gorm:"column:id; primary_key:yes"`
 	UserId int64 `json:"-" gorm:"column:user_id"`
 	// TeamId is the team the object belongs to; UserId is who created it.
-	TeamId           int64     `json:"team_id" gorm:"column:team_id"`
-	Interface        string    `json:"interface_type" gorm:"column:interface_type"`
-	Name             string    `json:"name"`
-	Host             string    `json:"host"`
-	Username         string    `json:"username,omitempty"`
-	Password         string    `json:"password,omitempty"`
+	TeamId    int64  `json:"team_id" gorm:"column:team_id"`
+	Interface string `json:"interface_type" gorm:"column:interface_type"`
+	Name      string `json:"name"`
+	Host      string `json:"host"`
+	Username  string `json:"username,omitempty"`
+	// Password is encrypted at rest (see models/encryption.go). It also
+	// holds the SMS transport's auth token, which is a secret too.
+	Password         string    `json:"password,omitempty" gorm:"serializer:secret"`
 	FromAddress      string    `json:"from_address"`
 	IgnoreCertErrors bool      `json:"ignore_cert_errors"`
 	Headers          []Header  `json:"headers"`
@@ -52,7 +54,7 @@ type SMTP struct {
 	// is the mailbox to send as.
 	TenantID        string `json:"tenant_id,omitempty" gorm:"column:tenant_id"`
 	ClientID        string `json:"client_id,omitempty" gorm:"column:client_id"`
-	ClientSecret    string `json:"client_secret,omitempty" gorm:"column:client_secret"`
+	ClientSecret    string `json:"client_secret,omitempty" gorm:"column:client_secret;serializer:secret"`
 	CredentialsFile string `json:"credentials_file,omitempty" gorm:"column:credentials_file"`
 	// GmailInsert selects the Gmail "direct inbox injection" (DMI) delivery
 	// mode: the lure is written straight into each recipient's mailbox with

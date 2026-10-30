@@ -154,6 +154,8 @@ Gophish reads a single JSON file (`config.json` by default, or the path passed w
 | `db_path` | `gophish.db` | SQLite file, or the MySQL DSN when `db_name` is `mysql`. |
 | `db_sslca_path` | `""` | Path to a CA cert to verify a TLS MySQL connection. |
 | `contact_address` | `""` | Address shown to recipients in the `X-Gophish-Contact` header. |
+| `encryption_key` | `""` | Base64 16/24/32-byte AES key for [credential encryption at rest](#credential-encryption-at-rest). Prefer `encryption_key_file` or `GOPHISH_ENCRYPTION_KEY`. |
+| `encryption_key_file` | `""` | Path to a file holding the base64 AES key. When this and `encryption_key` and the env var are all unset, a key is generated at `encryption.key` next to `config.json` on first run. |
 | `logging.filename` | `""` | Log file path; empty logs to stdout. |
 | `logging.level` | `""` | `debug`, `info`, `warning`, or `error`. |
 
@@ -531,6 +533,18 @@ Gophish records logins and failed logins (with the reason and IP address), logou
 
 Each user's API key can do anything their account can. It's masked on **Account Settings**; revealing it takes re-entering your password (and a 2FA code if enabled), and it's no longer rendered into admin pages, so an XSS can't read it from the DOM. For scripts and integrations, users can also create limited keys there, or with `POST /api/api_keys/`. A limited key is read only or read and write, can be limited to some parts of the API (campaigns, groups, templates, landing pages, sending profiles, and so on), and can expire. Limited keys start with `gpk_`, are shown once when they're created, and are used the same way as the full key. A limited key can never do more than its owner's account, and it can't create or manage API keys. 
 
+#### Credential encryption at rest
+
+The secrets Gophish stores in its database — sending-profile passwords (and the SMS transport's auth token, which shares that column), IMAP passwords, and the Microsoft Graph client secret — are encrypted at rest with AES-256-GCM. This is defense in depth against disclosure of the database file or a backup; it complements the API redaction above, which already keeps these secrets out of API responses.
+
+Encryption is on by default and needs no configuration. On first run, if no key is set, Gophish generates one and writes it to `encryption.key` next to `config.json` with `0600` permissions, logging the path. Keep that key file: without it, the encrypted secrets can't be read, so back it up alongside (but not inside) your database. You can instead supply the key yourself, as a base64-encoded 16/24/32-byte value, by any of:
+
+- the `GOPHISH_ENCRYPTION_KEY` environment variable (checked first; keeps the key off disk),
+- an `encryption_key_file` path in `config.json`, or
+- an `encryption_key` value inline in `config.json` (least preferred).
+
+Generate a key with `openssl rand -base64 32`. Existing databases are upgraded automatically: on startup any plaintext secret is re-written in its encrypted form, and a value is recognized as already encrypted by its `enc:v1:` prefix, so the pass is idempotent and safe to run on every boot. A database can be read back to plaintext only with the same key that wrote it; rotating the key is not yet automated (decrypt with the old key and re-encrypt would be required).
+
 ### Security
 
 This fork addresses the following advisories against gophish v0.12.1, each with a regression test:
@@ -550,7 +564,7 @@ This fork addresses the following advisories against gophish v0.12.1, each with 
 | CVE-2022-45003 | DoS via autofocus in a cloned site | `autofocus` stripped on import |
 | CVE-2022-45004 | XSS via a crafted landing page | Not applicable: landing-page HTML is never rendered in the admin origin |
 
-Additional hardening: credentials are never returned in API responses (encryption at rest is a follow-up); SSO won't auto-create admins without an explicit flag; LDAP refuses plaintext connections without TLS; rendered templates are size-capped; and admin responses carry `nosniff`, `Referrer-Policy`, CSP `frame-ancestors`, and `X-Frame-Options`.
+Additional hardening: credentials are never returned in API responses and are encrypted at rest (AES-256-GCM; see [Credential encryption at rest](#credential-encryption-at-rest)); SSO won't auto-create admins without an explicit flag; LDAP refuses plaintext connections without TLS; rendered templates are size-capped; and admin responses carry `nosniff`, `Referrer-Policy`, CSP `frame-ancestors`, and `X-Frame-Options`.
 
 One upstream issue has no fix yet: [GO-2025-3884](https://pkg.go.dev/vuln/GO-2025-3884) in `gorilla/csrf` (`trusted_origins` ignores scheme), which only applies when `trusted_origins` is set — see [Admin Server TLS](#admin-server-tls).
 

@@ -6,7 +6,7 @@ here need a go-ahead before they're built. For checks that still need to run on
 already-merged work, see `VERIFICATION_PENDING.md`.
 
 **Active roadmap (set 2026-10-30).** Build order: **(1) Gmail DMI — shipped,
-(2) MCP server endpoint — shipped, (3) credential encryption at rest.** Also
+(2) MCP server endpoint — shipped, (3) credential encryption at rest — shipped.** Also
 back on the roadmap after being deferred from phase 4: **MFA / 2FA lures** and
 **follow-up training** (the training design will be driven by the product owner
 — don't design it ahead of their input). Postgres remains out of scope (tenants
@@ -130,8 +130,8 @@ over the test recipients. The full plan above can be executed as written.
 ### MFA / 2FA lures
 Simulate real-time credential-plus-OTP capture (e.g. an attacker-in-the-middle
 style flow) rather than only static credential capture. Deferred from phase 4,
-**back on the active roadmap (2026-10-30)** — to be built after the MCP endpoint
-and credential encryption at rest.
+**back on the active roadmap (2026-10-30)** — next up now that DMI, the MCP
+endpoint, and credential encryption at rest have all shipped.
 
 ### Follow-up training
 After a target interacts with a lure, deliver a short training page/module and
@@ -141,6 +141,32 @@ drive the training design and has significant ideas for this area, so hold on a
 detailed design until that input lands.
 
 ## Security / maintenance
+
+### Credential encryption at rest — SHIPPED 2026-10-30
+DB secrets (sending-profile and IMAP passwords, Graph client secret) are
+encrypted at rest with AES-256-GCM, as defense in depth on top of the step-3
+API redaction (which was already shipped). This was security Task 11 steps 1–2.
+
+**Shipped:** new `encryption/` package (AES-256-GCM, `enc:v1:` + base64(nonce||
+ciphertext); plaintext passthrough when a value has no prefix or no key is
+configured; `Configure` resolves the key from `GOPHISH_ENCRYPTION_KEY` → config
+`encryption_key` → `encryption_key_file` → a generated `0600` key file next to
+`config.json`). A GORM field serializer (`models/encryption.go`, tag
+`gorm:"serializer:secret"` on `SMTP.Password`, `SMTP.ClientSecret`,
+`IMAP.Password`) encrypts on write / decrypts on read transparently, so model
+structs always hold plaintext and every load/save path is covered. A startup
+pass (`encryptExistingSecrets`, run from `models.Setup`) upgrades any plaintext
+rows in place, idempotently. A dual migration widens the MySQL `smtp`/`imap`
+`password` columns to varchar(512) (SQLite ignores length). Tests cover the
+crypto round-trip, key precedence/generation, and a MySQL + SQLite DB
+round-trip incl. the in-place upgrade. Documented in the README "Credential
+encryption at rest" section and the config reference.
+
+**Still deferred — Task 11 step 4** (separate): let config.json secrets
+(directory connector `client_secret`/`bind_password`, OIDC `client_secret`,
+SAML, LDAP bind password) come from env vars or `_file` paths. And **key
+rotation** is not automated (would need decrypt-with-old-key then
+re-encrypt-with-new).
 
 ### Replace CKEditor 4 with a CodeMirror source editor + sandboxed preview
 The template and landing-page HTML editors use a vendored **CKEditor 4.11.1**

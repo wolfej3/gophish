@@ -64,6 +64,9 @@ func TestLoadConfig(t *testing.T) {
 	expectedConfig.TestFlag = false
 	expectedConfig.AdminConf.CSRFKey = ""
 	expectedConfig.Logging = &log.Config{}
+	// LoadConfig records the path it loaded from so the default encryption
+	// key file can be placed next to it.
+	expectedConfig.ConfigPath = f.Name()
 	if !reflect.DeepEqual(expectedConfig, conf) {
 		t.Fatalf("invalid config received. expected %#v got %#v", expectedConfig, conf)
 	}
