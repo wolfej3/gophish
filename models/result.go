@@ -136,6 +136,23 @@ func (r *Result) HandleFormSubmit(details EventDetails) error {
 	return db.Save(r).Error
 }
 
+// HandleMFASubmit updates a Result in the case where the recipient submitted a
+// one-time verification code to the second step of an MFA lure. This is a
+// stronger outcome than a plain credential submit, so it is recorded as its
+// own "Submitted MFA Code" event. The top-level Result status is kept at
+// EventDataSubmit (an MFA submit always implies a credential submit) so the
+// existing status-driven funnel and dashboard are unaffected; the dedicated
+// count is derived from the event in getCampaignStats.
+func (r *Result) HandleMFASubmit(details EventDetails) error {
+	event, err := r.createEvent(EventMFASubmit, details)
+	if err != nil {
+		return err
+	}
+	r.Status = EventDataSubmit
+	r.ModifiedDate = event.Time
+	return db.Save(r).Error
+}
+
 // HandleEmailReport updates a Result in the case where they report a simulated
 // phishing email using the HTTP handler.
 func (r *Result) HandleEmailReport(details EventDetails) error {

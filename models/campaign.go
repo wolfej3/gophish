@@ -71,6 +71,7 @@ type CampaignStats struct {
 	OpenedEmail   int64 `json:"opened"`
 	ClickedLink   int64 `json:"clicked"`
 	SubmittedData int64 `json:"submitted_data"`
+	SubmittedMFA  int64 `json:"submitted_mfa"`
 	EmailReported int64 `json:"email_reported"`
 	Error         int64 `json:"error"`
 }
@@ -285,6 +286,14 @@ func getCampaignStats(cid int64) (CampaignStats, error) {
 		return s, err
 	}
 	query.Where("status=?", EventClicked).Count(&s.ClickedLink)
+	if err != nil {
+		return s, err
+	}
+	// MFA submissions are recorded as their own event rather than a result
+	// status, so count the distinct recipients that reached the code step.
+	err = db.Table("events").
+		Where("campaign_id = ? AND message = ?", cid, EventMFASubmit).
+		Distinct("email").Count(&s.SubmittedMFA).Error
 	if err != nil {
 		return s, err
 	}

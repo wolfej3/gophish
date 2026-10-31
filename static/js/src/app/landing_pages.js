@@ -14,6 +14,8 @@ function save(idx) {
     page.html = editor.getData()
     page.capture_credentials = $("#capture_credentials_checkbox").prop("checked")
     page.capture_passwords = $("#capture_passwords_checkbox").prop("checked")
+    page.capture_mfa = $("#capture_mfa_checkbox").prop("checked")
+    page.mfa_prompt = $("#mfa_prompt_input").val()
     page.redirect_url = $("#redirect_url_input").val()
     if (idx != -1) {
         page.id = pages[idx].id
@@ -43,8 +45,11 @@ function dismiss() {
     $("#html_editor").val("")
     $("#url").val("")
     $("#redirect_url_input").val("")
+    $("#mfa_prompt_input").val("")
     $("#modal").find("input[type='checkbox']").prop("checked", false)
     $("#capture_passwords").hide()
+    $("#capture_mfa").hide()
+    $("#mfa_prompt_group").hide()
     $("#redirect_url").hide()
     $("#modal").modal('hide')
 }
@@ -119,10 +124,16 @@ function edit(idx) {
         $("#html_editor").val(page.html)
         $("#capture_credentials_checkbox").prop("checked", page.capture_credentials)
         $("#capture_passwords_checkbox").prop("checked", page.capture_passwords)
+        $("#capture_mfa_checkbox").prop("checked", page.capture_mfa)
+        $("#mfa_prompt_input").val(page.mfa_prompt)
         $("#redirect_url_input").val(page.redirect_url)
         if (page.capture_credentials) {
             $("#capture_passwords").show()
+            $("#capture_mfa").show()
             $("#redirect_url").show()
+        }
+        if (page.capture_mfa) {
+            $("#mfa_prompt_group").show()
         }
     } else {
         $("#modalLabel").text("New Landing Page")
@@ -236,7 +247,16 @@ $(document).ready(function () {
     });
     $("#capture_credentials_checkbox").change(function () {
         $("#capture_passwords").toggle()
+        $("#capture_mfa").toggle()
         $("#redirect_url").toggle()
+        // If credential capture is turned off, the MFA step can't run either.
+        if (!$(this).prop("checked")) {
+            $("#capture_mfa_checkbox").prop("checked", false)
+            $("#mfa_prompt_group").hide()
+        }
+    })
+    $("#capture_mfa_checkbox").change(function () {
+        $("#mfa_prompt_group").toggle($(this).prop("checked"))
     })
     CKEDITOR.on('dialogDefinition', function (ev) {
         // Take the dialog name and its definition from the event data.

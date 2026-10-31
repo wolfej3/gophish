@@ -52,6 +52,7 @@ const (
 	EventOpened        string = "Email Opened"
 	EventClicked       string = "Clicked Link"
 	EventDataSubmit    string = "Submitted Data"
+	EventMFASubmit     string = "Submitted MFA Code"
 	EventReported      string = "Email Reported"
 	EventProxyRequest  string = "Proxied request"
 	StatusSuccess      string = "Success"

@@ -76,6 +76,17 @@
                         Be careful with this!
                     </div>
                 </div>
+                <div class="checkbox checkbox-primary" id="capture_mfa">
+                    <input id="capture_mfa_checkbox" type="checkbox">
+                    <label for="capture_mfa_checkbox">Capture MFA / verification code <i class="fa fa-question-circle"
+                            data-toggle="tooltip" data-placement="right" title="After the credential form is submitted, serve a second page asking for a one-time verification code. This measures susceptibility to MFA phishing. The code is recorded as evidence only — Gophish never relays it to a real service or captures a real session."></i></label>
+                    <div id="mfa_prompt_group">
+                        <label class="control-label" for="mfa_prompt_input">Custom verification-code page (optional):</label>
+                        <div class="form-group">
+                            <textarea id="mfa_prompt_input" class="form-control" rows="6" placeholder="Leave blank to use the built-in verification-code page. Any &lt;form&gt; here is rewritten to post the code back to Gophish."></textarea>
+                        </div>
+                    </div>
+                </div>
                 <div id="redirect_url">
                     <label class="control-label" for="redirect_url_input">Redirect to: <i class="fa fa-question-circle"
                             data-toggle="tooltip" data-placement="right" title="This option lets you redirect the user to a page after credentials are submitted."></i></label>

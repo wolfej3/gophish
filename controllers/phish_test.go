@@ -418,3 +418,91 @@ func TestRedirectTemplating(t *testing.T) {
 		t.Fatalf("invalid redirect received. expected %s got %s", expectedURL, gotURL)
 	}
 }
+
+// TestMFALureTwoStep verifies the MFA lure's two-step flow: the first
+// (credential) POST serves the verification-code prompt rather than
+// redirecting, and the second POST (carrying the MFA marker) records a
+// "Submitted MFA Code" event and then redirects.
+func TestMFALureTwoStep(t *testing.T) {
+	ctx := setupTest(t)
+	defer tearDown(t, ctx)
+	p := models.Page{
+		Name:        "MFA Lure Page",
+		HTML:        "<html><body><form><input name=\"username\"/><input name=\"password\" type=\"password\"/></form></body></html>",
+		UserId:      1,
+		TeamId:      1,
+		CaptureMFA:  true,
+		RedirectURL: "http://example.com/done",
+	}
+	if err := models.PostPage(&p); err != nil {
+		t.Fatalf("error posting new page: %v", err)
+	}
+	smtp, _ := models.GetSMTP(1, 1)
+	template, _ := models.GetTemplate(1, 1)
+	group, _ := models.GetGroup(1, 1)
+
+	campaign := models.Campaign{Name: "MFA campaign"}
+	campaign.UserId = 1
+	campaign.TeamId = 1
+	campaign.Template = template
+	campaign.Page = p
+	campaign.SMTP = smtp
+	campaign.Groups = []models.Group{group}
+	if err := models.PostCampaign(&campaign, campaign.UserId, 1); err != nil {
+		t.Fatalf("error creating campaign: %v", err)
+	}
+	result := campaign.Results[0]
+
+	client := http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+
+	// Step 1: credential submit. Expect the verification-code prompt, not a
+	// redirect.
+	resp, err := client.PostForm(fmt.Sprintf("%s/?%s=%s", ctx.phishServer.URL, models.RecipientParameter, result.RId), url.Values{"username": {"test"}, "password": {"secret"}})
+	if err != nil {
+		t.Fatalf("error posting credentials: %v", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("step 1: expected 200, got %d", resp.StatusCode)
+	}
+	body, _ := ioutil.ReadAll(resp.Body)
+	resp.Body.Close()
+	if !bytes.Contains(body, []byte(models.MFAMarkerField)) {
+		t.Fatalf("step 1: verification-code prompt missing the MFA marker field")
+	}
+
+	// Step 2: verification-code submit (carries the marker). Expect a redirect.
+	resp, err = client.PostForm(fmt.Sprintf("%s/?%s=%s", ctx.phishServer.URL, models.RecipientParameter, result.RId), url.Values{models.MFAMarkerField: {"1"}, "mfa_code": {"123456"}})
+	if err != nil {
+		t.Fatalf("error posting mfa code: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusFound {
+		t.Fatalf("step 2: expected redirect (302), got %d", resp.StatusCode)
+	}
+	gotURL, err := resp.Location()
+	if err != nil {
+		t.Fatalf("error getting Location header: %v", err)
+	}
+	if gotURL.String() != "http://example.com/done" {
+		t.Fatalf("step 2: invalid redirect, got %s", gotURL)
+	}
+
+	// A "Submitted MFA Code" event was recorded for the recipient.
+	reloaded, err := models.GetCampaign(campaign.Id, 1)
+	if err != nil {
+		t.Fatalf("error reloading campaign: %v", err)
+	}
+	var mfaEvents int
+	for _, e := range reloaded.Events {
+		if e.Message == models.EventMFASubmit && e.Email == result.Email {
+			mfaEvents++
+		}
+	}
+	if mfaEvents != 1 {
+		t.Fatalf("expected 1 Submitted MFA Code event, got %d", mfaEvents)
+	}
+}

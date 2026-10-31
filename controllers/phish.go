@@ -269,9 +269,18 @@ func (ps *PhishingServer) PhishHandler(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	// isMFACodeStep reports whether this POST is the verification-code step of
+	// an MFA lure (as opposed to the initial credential submit), identified by
+	// the hidden marker field the prompt carries.
+	isMFACodeStep := r.Method == "POST" && r.Form.Get(models.MFAMarkerField) != ""
 	switch {
 	case r.Method == "GET":
 		err = rs.HandleClickedLink(d)
+		if err != nil {
+			log.Error(err)
+		}
+	case isMFACodeStep:
+		err = rs.HandleMFASubmit(d)
 		if err != nil {
 			log.Error(err)
 		}
@@ -285,8 +294,70 @@ func (ps *PhishingServer) PhishHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Error(err)
 		http.NotFound(w, r)
+		return
+	}
+	// For an MFA lure, the first (credential) submit doesn't redirect yet —
+	// instead we serve the verification-code prompt as a second step. The
+	// code step (and every other request) falls through to the normal
+	// response below.
+	if r.Method == "POST" && p.CaptureMFA && !isMFACodeStep {
+		renderMFAPrompt(w, r, ptx, p)
+		return
 	}
 	renderPhishResponse(w, r, ptx, p)
+}
+
+// defaultMFAPrompt is the built-in verification-code page served when a page
+// has CaptureMFA enabled but no custom MFAPrompt. It is intentionally neutral
+// and fully inert: a single code field posting back to Gophish with the MFA
+// marker, no external resources, no scripts. It is run through the phishing
+// template engine, so {{.URL}}, {{.RId}} and the recipient fields are
+// available to anyone who customizes it.
+const defaultMFAPrompt = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verify your identity</title>
+<style>
+body{font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f3f4f6;margin:0;color:#1f2937}
+.card{max-width:360px;margin:9vh auto;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:32px 28px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+h1{font-size:20px;margin:0 0 8px}
+p{font-size:14px;color:#6b7280;margin:0 0 20px}
+label{display:block;font-size:13px;font-weight:600;margin:0 0 6px}
+input[type=text]{width:100%;box-sizing:border-box;padding:10px 12px;font-size:16px;letter-spacing:2px;border:1px solid #d1d5db;border-radius:6px}
+button{margin-top:18px;width:100%;padding:11px;font-size:15px;font-weight:600;color:#fff;background:#2563eb;border:0;border-radius:6px;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="card">
+<h1>Two-step verification</h1>
+<p>Enter the verification code from your authenticator app or text message to continue.</p>
+<form action="" method="POST" autocomplete="off">
+<input type="hidden" name="` + models.MFAMarkerField + `" value="1">
+<label for="mfa_code">Verification code</label>
+<input type="text" id="mfa_code" name="mfa_code" inputmode="numeric" autocomplete="one-time-code" autofocus>
+<button type="submit">Verify</button>
+</form>
+</div>
+</body>
+</html>`
+
+// renderMFAPrompt serves the verification-code step of an MFA lure: the page's
+// custom MFAPrompt when set, otherwise the built-in neutral prompt. Both are
+// run through the phishing template engine.
+func renderMFAPrompt(w http.ResponseWriter, r *http.Request, ptx models.PhishingTemplateContext, p models.Page) {
+	promptHTML := p.MFAPrompt
+	if strings.TrimSpace(promptHTML) == "" {
+		promptHTML = defaultMFAPrompt
+	}
+	html, err := models.ExecuteTemplate(promptHTML, ptx)
+	if err != nil {
+		log.Error(err)
+		http.NotFound(w, r)
+		return
+	}
+	w.Write([]byte(html))
 }
 
 // renderPhishResponse handles rendering the correct response to the phishing

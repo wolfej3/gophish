@@ -14,14 +14,30 @@ type Page struct {
 	Id     int64 `json:"id" gorm:"column:id; primary_key:yes"`
 	UserId int64 `json:"-" gorm:"column:user_id"`
 	// TeamId is the team the object belongs to; UserId is who created it.
-	TeamId             int64     `json:"team_id" gorm:"column:team_id"`
-	Name               string    `json:"name"`
-	HTML               string    `json:"html" gorm:"column:html"`
-	CaptureCredentials bool      `json:"capture_credentials" gorm:"column:capture_credentials"`
-	CapturePasswords   bool      `json:"capture_passwords" gorm:"column:capture_passwords"`
-	RedirectURL        string    `json:"redirect_url" gorm:"column:redirect_url"`
-	ModifiedDate       time.Time `json:"modified_date"`
+	TeamId             int64  `json:"team_id" gorm:"column:team_id"`
+	Name               string `json:"name"`
+	HTML               string `json:"html" gorm:"column:html"`
+	CaptureCredentials bool   `json:"capture_credentials" gorm:"column:capture_credentials"`
+	CapturePasswords   bool   `json:"capture_passwords" gorm:"column:capture_passwords"`
+	// CaptureMFA turns the landing page into a two-step lure: after the
+	// recipient submits the credential form, a second page prompts for a
+	// one-time verification code, which is recorded as a distinct
+	// "Submitted MFA Code" event. This is an awareness-simulation measurement
+	// only — Gophish does not relay the code to any real service and never
+	// captures or forwards a real authenticated session. See MFAPrompt.
+	CaptureMFA bool `json:"capture_mfa" gorm:"column:capture_mfa"`
+	// MFAPrompt is optional custom HTML for the verification-code step. When
+	// blank, a built-in neutral prompt is served (see controllers). Any form
+	// in a custom prompt is rewritten to post back to Gophish with the MFA
+	// marker on save, exactly like the credential form.
+	MFAPrompt    string    `json:"mfa_prompt" gorm:"column:mfa_prompt"`
+	RedirectURL  string    `json:"redirect_url" gorm:"column:redirect_url"`
+	ModifiedDate time.Time `json:"modified_date"`
 }
+
+// MFAMarkerField is the hidden form field that distinguishes the
+// verification-code step of an MFA lure from the initial credential submit.
+const MFAMarkerField = "__mfa"
 
 // ErrPageNameNotSpecified is thrown if the name of the landing page is blank.
 var ErrPageNameNotSpecified = errors.New("Page Name not specified")
@@ -71,6 +87,33 @@ func (p *Page) parseHTML() error {
 	return err
 }
 
+// parseMFAPrompt rewrites a custom verification-code prompt on save so that it
+// behaves like the credential form: every form posts back to Gophish (action
+// cleared) and carries the hidden MFA marker so the submit is recorded as the
+// code step rather than another credential submit. If the author left the
+// prompt blank, there is nothing to do and the built-in prompt is used at
+// serve time.
+func (p *Page) parseMFAPrompt() error {
+	if strings.TrimSpace(p.MFAPrompt) == "" {
+		return nil
+	}
+	d, err := goquery.NewDocumentFromReader(strings.NewReader(p.MFAPrompt))
+	if err != nil {
+		return err
+	}
+	forms := d.Find("form")
+	forms.Each(func(i int, f *goquery.Selection) {
+		f.SetAttr("action", "")
+		// Inject the marker so the handler can tell this submit apart from the
+		// credential submit, unless the author already placed one.
+		if f.Find("input[name='"+MFAMarkerField+"']").Length() == 0 {
+			f.PrependHtml(`<input type="hidden" name="` + MFAMarkerField + `" value="1">`)
+		}
+	})
+	p.MFAPrompt, err = d.Html()
+	return err
+}
+
 // Validate ensures that a page contains the appropriate details
 func (p *Page) Validate() error {
 	if p.Name == "" {
@@ -81,10 +124,21 @@ func (p *Page) Validate() error {
 	if p.CapturePasswords && !p.CaptureCredentials {
 		p.CaptureCredentials = true
 	}
+	// An MFA lure prompts for a verification code after the credential form,
+	// so capturing credentials is implied.
+	if p.CaptureMFA && !p.CaptureCredentials {
+		p.CaptureCredentials = true
+	}
 	if err := ValidateTemplate(p.HTML); err != nil {
 		return err
 	}
 	if err := ValidateTemplate(p.RedirectURL); err != nil {
+		return err
+	}
+	if err := ValidateTemplate(p.MFAPrompt); err != nil {
+		return err
+	}
+	if err := p.parseMFAPrompt(); err != nil {
 		return err
 	}
 	return p.parseHTML()

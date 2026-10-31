@@ -7,10 +7,10 @@ already-merged work, see `VERIFICATION_PENDING.md`.
 
 **Active roadmap (set 2026-10-30).** Build order: **(1) Gmail DMI — shipped,
 (2) MCP server endpoint — shipped, (3) credential encryption at rest — shipped.** Also
-back on the roadmap after being deferred from phase 4: **MFA / 2FA lures** and
-**follow-up training** (the training design will be driven by the product owner
-— don't design it ahead of their input). Postgres remains out of scope (tenants
-are built on MySQL).
+back on the roadmap after being deferred from phase 4: **MFA / 2FA lures — shipped
+(2026-10-31)** and **follow-up training** (next up; the training design will be
+driven by the product owner — don't design it ahead of their input). Postgres
+remains out of scope (tenants are built on MySQL).
 
 ## Lures
 
@@ -127,11 +127,45 @@ differs per message. Consequences:
 are a Workspace + a service account with domain-wide delegation for `gmail.insert`
 over the test recipients. The full plan above can be executed as written.
 
-### MFA / 2FA lures
-Simulate real-time credential-plus-OTP capture (e.g. an attacker-in-the-middle
-style flow) rather than only static credential capture. Deferred from phase 4,
-**back on the active roadmap (2026-10-30)** — next up now that DMI, the MCP
-endpoint, and credential encryption at rest have all shipped.
+### MFA / 2FA lures — SHIPPED 2026-10-31
+Capture a one-time verification code in addition to credentials, so a campaign
+measures susceptibility to MFA phishing rather than only static credential
+capture. Deferred from phase 4, back on the roadmap 2026-10-30, built once DMI,
+the MCP endpoint, and credential encryption at rest had shipped.
+
+**Scope decision.** A *real* adversary-in-the-middle flow proxies the live
+target login, relays the victim's password and code to it in real time, and
+steals the resulting authenticated **session cookie**. Building that — a live
+relay against real third-party logins that yields working stolen sessions — is
+an offensive credential/session-theft tool and is **intentionally out of
+scope.** The shipped feature is the *simulation* a phishing-awareness platform
+needs: it measures who would surrender a second factor, without relaying the
+code anywhere or capturing a real session.
+
+**Shipped:** a landing page gains `CaptureMFA` (+ optional custom `MFAPrompt`
+HTML). When on, the landing page becomes two-step — the credential POST serves
+a verification-code prompt (built-in neutral page, or the author's custom HTML
+with its form rewritten on save to post back with a hidden `__mfa` marker)
+instead of redirecting; the code POST records a distinct `EventMFASubmit`
+("Submitted MFA Code") event and then redirects as normal
+(`controllers/phish.go` `renderMFAPrompt` + the two-step switch;
+`models.Page`, `Result.HandleMFASubmit`). The result status stays at
+`EventDataSubmit` (an MFA submit implies a credential submit) so the existing
+status funnel/dashboard are untouched; a dedicated `SubmittedMFA` count is
+derived from the events table in `getCampaignStats` and exposed on the campaign
+summary as `submitted_mfa`. The captured code shows in the recipient timeline
+(a `fa-key` entry was added to `campaign_results.js`). Admin UI: a **Capture
+MFA / verification code** checkbox + optional custom-page textarea on the
+landing-page editor. Dual migration `20261109000000_0.16.0_mfa_lures.sql` adds
+`capture_mfa` + `mfa_prompt` to `pages`. Documented in the README
+"MFA / 2FA lures" section.
+
+**Possible later enhancements (not built):** a dedicated segment for MFA
+submissions in the campaign results funnel/donut (today it rolls up under
+Submitted Data in the gauge, and is distinct only in the timeline + the
+`submitted_mfa` stat); and a live browser pass over the landing-page editor
+toggle (the backend + HTTP two-step are covered by unit/controller tests on
+SQLite and MySQL).
 
 ### Follow-up training
 After a target interacts with a lure, deliver a short training page/module and

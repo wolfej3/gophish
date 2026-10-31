@@ -67,6 +67,13 @@ var statuses = {
         icon: "fa-exclamation",
         point: "ct-point-clicked"
     },
+    //not a status, but is used for the campaign timeline and user timeline
+    "Submitted MFA Code": {
+        color: "#c0392b",
+        label: "label-danger",
+        icon: "fa-key",
+        point: "ct-point-clicked"
+    },
     "Unknown": {
         color: "#6c7a89",
         label: "label-default",

@@ -21,6 +21,7 @@ This version modernizes Gophish and adds admin security features. The details ar
 - **Teams and tenants:** objects are shared within teams instead of per login, teams nest under isolated client **tenants**, and a provider-admin role spans every tenant. Each user also gets a private Personal team. See [Teams](#teams) and [Tenants](#tenants).
 - **QR code lures:** email templates can embed a per-recipient QR code (`{{.QR}}`) that encodes the recipient's tracked link, to simulate "quishing". See [QR code lures](#qr-code-lures).
 - **SMS lures:** send the lure as a text message ("smishing") through an SMS provider (Twilio), with a masked short link and automatic suppression of link-preview/scanner false clicks. See [SMS lures](#sms-lures).
+- **MFA / 2FA lures:** a landing page can prompt for a one-time verification code as a second step, recording a distinct "Submitted MFA Code" event to measure who would hand over their second factor — a simulation only, with no relay of the code or theft of a real session. See [MFA / 2FA lures](#mfa--2fa-lures).
 
 #### Upgrading
 
@@ -403,6 +404,37 @@ configurable.
   others can be added later.
 - **Testing:** set `GOPHISH_SMS_BASE_URL` to point the provider client at a
   self-hosted gateway or a local mock instead of the real Twilio endpoint.
+
+### MFA / 2FA lures
+
+Attackers know a stolen password alone often isn't enough, so a convincing lure
+asks for the one-time code too. To train for that, a landing page can run as a
+**two-step lure**: after the recipient submits the credential form, Gophish
+serves a second page asking for a verification code. Submitting it records a
+distinct **Submitted MFA Code** event, so a campaign can measure not just who
+gave up their password but who would also hand over their second factor.
+
+Turn it on with the **Capture MFA / verification code** checkbox on a landing
+page (it implies Capture Submitted Data), or set `capture_mfa: true` via the
+API. Leave the custom-page field blank to use the built-in prompt, or supply
+your own HTML in **Custom verification-code page** (or the `mfa_prompt` field) —
+any `<form>` you include is rewritten on save to post the code back to Gophish,
+exactly like the credential form. The captured code appears in the recipient's
+result timeline alongside the credentials, and the per-campaign count is on the
+campaign summary as `submitted_mfa`.
+
+#### What this is, and is not
+
+This is an **awareness-simulation measurement, not an attack tool.** Gophish
+records that the recipient *would have* surrendered a code; it does **not**:
+
+- proxy, forward, or replay the code to any real login (Microsoft, Google, or
+  anything else) — it is never validated or sent anywhere, and
+- capture or steal a real authenticated **session or cookie**.
+
+In other words, this measures susceptibility to MFA phishing without performing
+the adversary-in-the-middle credential/session relay that a real attack would.
+A live relay against a third-party login is intentionally out of scope.
 
 ### MCP server
 
