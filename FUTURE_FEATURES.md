@@ -160,12 +160,24 @@ landing-page editor. Dual migration `20261109000000_0.16.0_mfa_lures.sql` adds
 `capture_mfa` + `mfa_prompt` to `pages`. Documented in the README
 "MFA / 2FA lures" section.
 
-**Possible later enhancements (not built):** a dedicated segment for MFA
-submissions in the campaign results funnel/donut (today it rolls up under
-Submitted Data in the gauge, and is distinct only in the timeline + the
-`submitted_mfa` stat); and a live browser pass over the landing-page editor
-toggle (the backend + HTTP two-step are covered by unit/controller tests on
-SQLite and MySQL).
+**Funnel segment — SHIPPED 2026-11-02.** The results funnel now has a dedicated
+MFA gauge. A `submitted_mfa` donut sits between Submitted Data and Reported on
+both the campaign results page and the dashboard (grids rebalanced to six
+col-lg-2 gauges, spacers dropped); the dashboard details table gained an
+`fa-key` column + the stat in its row tooltip. On the results page the gauge
+count is derived from the timeline events (`countMFASubmissions`), since an MFA
+submit keeps the result status at Submitted Data; `"Submitted MFA Code"` is now
+in `statusMapping` (results) and `statsMapping`/`statuses` (dashboard). Bundles
+rebuilt. Verified: API `submitted_mfa` stat correct end-to-end against a
+throwaway instance (4 recipients → submitted_data 2, submitted_mfa 1), and the
+served bundles + embedded templates carry the wiring. A pixel-level visual
+render wasn't done this session (the self-signed admin cert blocks the built-in
+browser and Claude in Chrome wasn't connected).
+
+**Possible later enhancement (not built):** a live browser pass over the
+landing-page editor toggle and the gauges (the backend + HTTP two-step are
+covered by unit/controller tests on SQLite and MySQL, and the served
+bundles/templates were confirmed to carry the changes).
 
 ### Follow-up training
 After a target interacts with a lure, deliver a short training page/module and

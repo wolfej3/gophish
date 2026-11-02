@@ -109,7 +109,22 @@ var statusMapping = {
     "Email Opened": "opened",
     "Clicked Link": "clicked",
     "Submitted Data": "submitted_data",
+    "Submitted MFA Code": "submitted_mfa",
     "Email Reported": "reported",
+}
+
+// countMFASubmissions returns the number of distinct recipients that reached
+// the verification-code step of an MFA lure. It is derived from the timeline
+// events rather than result.status (an MFA submit keeps the result at
+// "Submitted Data"), mirroring the SubmittedMFA stat on the server.
+function countMFASubmissions(timeline) {
+    var emails = {}
+    $.each(timeline || [], function (i, event) {
+        if (event.message == "Submitted MFA Code") {
+            emails[event.email] = true
+        }
+    })
+    return Object.keys(emails).length
 }
 
 // This is an underwhelming attempt at an enum
@@ -680,6 +695,9 @@ function poll() {
                     email_series_data[progressListing[i]]++
                 }
             })
+            // MFA submissions aren't a result status, so count them from the
+            // timeline events.
+            email_series_data['Submitted MFA Code'] = countMFASubmissions(campaign.timeline)
             $.each(email_series_data, function (status, count) {
                 var email_data = []
                 if (!(status in statusMapping)) {
@@ -826,6 +844,9 @@ function load() {
                         email_series_data[progressListing[i]]++
                     }
                 })
+                // MFA submissions aren't a result status, so count them from
+                // the timeline events.
+                email_series_data['Submitted MFA Code'] = countMFASubmissions(campaign.timeline)
                 resultsTable.draw();
                 // Setup tooltips
                 $('[data-toggle="tooltip"]').tooltip()
