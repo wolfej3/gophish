@@ -50,6 +50,33 @@ tests), all green on MySQL.
   via `ADMIN_TRUSTED_ORIGINS` (the POST reached the auth check rather than being
   rejected as a cross-origin request).
 
+## Known security advisory — deferred (gorilla/csrf CSRF)
+
+`github.com/gorilla/csrf` v1.7.3 is affected by **GO-2025-3884 /
+CVE-2025-47909** (Dependabot #1, Moderate): its `TrustedOrigins` matching
+ignores the scheme, so a host added to `admin_server.trusted_origins` is also
+trusted over plain `http://`. A network attacker who controls that host's HTTP
+origin could then bypass the origin check and mount CSRF. The library is
+unmaintained and the advisory lists **no fixed version**, so there is nothing to
+bump to. We call the vulnerable path at `controllers/route.go:221`
+(`csrf.TrustedOrigins`), confirmed reachable by `govulncheck`.
+
+**Why it is deferred, not urgent:** the default config ships
+`"trusted_origins": []` (empty), so no extra origins are trusted and the
+token-based CSRF layer still applies — the bug only bites an operator who
+populates `trusted_origins` with real hostnames that are also reachable over
+plain HTTP. Interim guidance: don't add plain-HTTP hosts to `trusted_origins`.
+
+**Fix when picked up:** swap to the drop-in `filippo.io/csrf/gorilla`, which
+keeps the same API (`csrf.Protect` / `FieldName` / `Secure` / `TrustedOrigins` /
+`Token`) and fixes the scheme validation. Change the import in
+`controllers/route.go` and `controllers/two_factor.go`, `go get filippo.io/csrf`
++ `go mod tidy`, then run the existing CSRF tests (`route_test.go`,
+`session_test.go`, `apikey_session_test.go`). No template/JS changes. (The Go
+1.25+ stdlib `http.CrossOriginProtection` is the heavier alternative — it drops
+the token model gophish's forms rely on.) Dep bumps for the other advisories
+(go-jose 4.1.8, x/net 0.62.0) landed in commit 36cfe7c.
+
 ## Note observed during verification (not a blocker)
 
 On the admin login **error paths** (CSRF reject, bad password) over the direct
