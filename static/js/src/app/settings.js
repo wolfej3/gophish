@@ -22,8 +22,7 @@ $(document).ready(function () {
         e.preventDefault()
         $.post("/settings/api_key/reveal", {
             current_password: $("#api_reveal_password").val(),
-            code: $("#api_reveal_code").val(),
-            csrf_token: csrf_token
+            code: $("#api_reveal_code").val()
         })
             .done(function (data) {
                 $("#api_key").val(data.api_key)
@@ -52,7 +51,7 @@ $(document).ready(function () {
             $("#defaultTeamGroup").show()
         })
     $("#defaultTeamSelect").change(function () {
-        $.post("/settings/default_team", { default_team_id: $(this).val(), csrf_token: csrf_token })
+        $.post("/settings/default_team", { default_team_id: $(this).val() })
             .done(function () { successFlash("Default team updated") })
             .fail(function (data) { errorFlash(data.responseJSON ? data.responseJSON.message : "Error updating default team") })
     })

@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/PuerkitoBio/goquery"
 	mid "github.com/gophish/gophish/middleware"
 	"github.com/gophish/gophish/models"
 )
@@ -53,28 +52,8 @@ func newBrowser(t *testing.T, ctx *testContext) *browser {
 	}
 }
 
-// csrfToken loads the page at path and returns the CSRF token in its form.
-func (b *browser) csrfToken(path string) string {
-	resp, err := b.client.Get(b.ctx.adminServer.URL + path)
-	if err != nil {
-		b.t.Fatalf("error requesting %s: %v", path, err)
-	}
-	defer resp.Body.Close()
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
-	if err != nil {
-		b.t.Fatalf("error parsing %s: %v", path, err)
-	}
-	token, ok := doc.Find("input[name='csrf_token']").First().Attr("value")
-	if !ok {
-		b.t.Fatalf("no csrf_token found on %s", path)
-	}
-	return token
-}
-
-// postForm submits a form to path with the page's CSRF token and the
-// Referer a browser would send.
+// postForm submits a form to path with the Referer a browser would send.
 func (b *browser) postForm(path string, values url.Values) *http.Response {
-	values.Set("csrf_token", b.csrfToken(path))
 	req, err := http.NewRequest(http.MethodPost, b.ctx.adminServer.URL+path, strings.NewReader(values.Encode()))
 	if err != nil {
 		b.t.Fatalf("error creating request: %v", err)

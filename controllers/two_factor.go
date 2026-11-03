@@ -14,7 +14,6 @@ import (
 	mid "github.com/gophish/gophish/middleware"
 	"github.com/gophish/gophish/models"
 	templatefs "github.com/gophish/gophish/templates"
-	"github.com/gorilla/csrf"
 	"github.com/gorilla/sessions"
 )
 
@@ -76,8 +75,7 @@ func (as *AdminServer) renderSecondFactor(w http.ResponseWriter, r *http.Request
 		User    models.User
 		Title   string
 		Flashes []interface{}
-		Token   string
-	}{Title: "Two-Factor Authentication", Token: csrf.Token(r)}
+	}{Title: "Two-Factor Authentication"}
 	params.Flashes = session.Flashes()
 	session.Save(r, w)
 	templates := template.New("template")

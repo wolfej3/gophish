@@ -6,13 +6,11 @@ import (
 	"net/url"
 	"strings"
 	"testing"
-
-	"github.com/PuerkitoBio/goquery"
 )
 
-// getLoginToken fetches the login page, returning the response (which carries
-// the CSRF cookie) and the CSRF token embedded in the form.
-func getLoginToken(t *testing.T, ctx *testContext) (*http.Response, string) {
+// getLoginPage fetches the login page and returns the response, whose
+// Set-Cookie carries the session the login POST will use.
+func getLoginPage(t *testing.T, ctx *testContext) *http.Response {
 	resp, err := ctx.adminServer.Client().Get(fmt.Sprintf("%s/login", ctx.adminServer.URL))
 	if err != nil {
 		t.Fatalf("error requesting the /login endpoint: %v", err)
@@ -22,26 +20,16 @@ func getLoginToken(t *testing.T, ctx *testContext) (*http.Response, string) {
 	if got != expected {
 		t.Fatalf("invalid status code received. expected %d got %d", expected, got)
 	}
-
-	doc, err := goquery.NewDocumentFromResponse(resp)
-	if err != nil {
-		t.Fatalf("error parsing /login response body")
-	}
-	elem := doc.Find("input[name='csrf_token']").First()
-	token, ok := elem.Attr("value")
-	if !ok {
-		t.Fatal("unable to find csrf_token value in login response")
-	}
-	return resp, token
+	return resp
 }
 
-// newLoginRequest builds a login form submission with the provided Referer,
-// mirroring what a browser sends when submitting the login page.
-func newLoginRequest(t *testing.T, ctx *testContext, resp *http.Response, token, username, password, optionalPath, referer string) *http.Request {
+// newLoginRequest builds a login form submission, mirroring what a browser
+// sends when submitting the login page. Callers add Origin/Sec-Fetch-Site
+// headers to simulate a cross-origin submission.
+func newLoginRequest(t *testing.T, ctx *testContext, resp *http.Response, username, password, optionalPath string) *http.Request {
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/login%s", ctx.adminServer.URL, optionalPath), strings.NewReader(url.Values{
-		"username":   {username},
-		"password":   {password},
-		"csrf_token": {token},
+		"username": {username},
+		"password": {password},
 	}.Encode()))
 	if err != nil {
 		t.Fatalf("error creating new /login request: %v", err)
@@ -49,18 +37,15 @@ func newLoginRequest(t *testing.T, ctx *testContext, resp *http.Response, token,
 
 	req.Header.Set("Cookie", resp.Header.Get("Set-Cookie"))
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	if referer != "" {
-		req.Header.Set("Referer", referer)
-	}
 	return req
 }
 
 func attemptLogin(t *testing.T, ctx *testContext, client *http.Client, username, password, optionalPath string) *http.Response {
-	resp, token := getLoginToken(t, ctx)
+	resp := getLoginPage(t, ctx)
 	if client == nil {
 		client = ctx.adminServer.Client()
 	}
-	req := newLoginRequest(t, ctx, resp, token, username, password, optionalPath, fmt.Sprintf("%s/login", ctx.adminServer.URL))
+	req := newLoginRequest(t, ctx, resp, username, password, optionalPath)
 	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("error requesting the /login endpoint: %v", err)
@@ -68,17 +53,22 @@ func attemptLogin(t *testing.T, ctx *testContext, client *http.Client, username,
 	return resp
 }
 
-func TestLoginRefererRequired(t *testing.T) {
+// TestLoginCrossOriginRejected ensures a cross-origin login POST — signalled
+// either by Sec-Fetch-Site or by a foreign Origin header — is rejected by the
+// standard library's cross-origin protection.
+func TestLoginCrossOriginRejected(t *testing.T) {
 	ctx := setupTest(t)
 	defer tearDown(t, ctx)
-	referers := map[string]string{
-		"missing":      "",
-		"cross-origin": "https://evil.example.com/login",
-		"plain http":   strings.Replace(ctx.adminServer.URL, "https://", "http://", 1) + "/login",
+	cases := map[string]map[string]string{
+		"Sec-Fetch-Site cross-site": {"Sec-Fetch-Site": "cross-site"},
+		"foreign Origin":            {"Origin": "https://evil.example.com"},
 	}
-	for name, referer := range referers {
-		resp, token := getLoginToken(t, ctx)
-		req := newLoginRequest(t, ctx, resp, token, "admin", "gophish", "", referer)
+	for name, headers := range cases {
+		resp := getLoginPage(t, ctx)
+		req := newLoginRequest(t, ctx, resp, "admin", "gophish", "")
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
 		resp, err := ctx.adminServer.Client().Do(req)
 		if err != nil {
 			t.Fatalf("error requesting the /login endpoint: %v", err)
@@ -86,28 +76,26 @@ func TestLoginRefererRequired(t *testing.T) {
 		got := resp.StatusCode
 		expected := http.StatusForbidden
 		if got != expected {
-			t.Fatalf("%s referer: invalid status code received. expected %d got %d", name, expected, got)
+			t.Fatalf("%s: invalid status code received. expected %d got %d", name, expected, got)
 		}
 	}
 }
 
-func TestLoginCSRF(t *testing.T) {
+// TestLoginSameOriginAllowed ensures a same-origin login POST passes the
+// cross-origin check and reaches authentication (a 403 would mean the check
+// wrongly rejected it).
+func TestLoginSameOriginAllowed(t *testing.T) {
 	ctx := setupTest(t)
 	defer tearDown(t, ctx)
-	resp, err := ctx.adminServer.Client().PostForm(fmt.Sprintf("%s/login", ctx.adminServer.URL),
-		url.Values{
-			"username": {"admin"},
-			"password": {"gophish"},
-		})
-
+	resp := getLoginPage(t, ctx)
+	req := newLoginRequest(t, ctx, resp, "admin", "gophish", "")
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	resp, err := ctx.adminServer.Client().Do(req)
 	if err != nil {
 		t.Fatalf("error requesting the /login endpoint: %v", err)
 	}
-
-	got := resp.StatusCode
-	expected := http.StatusForbidden
-	if got != expected {
-		t.Fatalf("invalid status code received. expected %d got %d", expected, got)
+	if resp.StatusCode == http.StatusForbidden {
+		t.Fatalf("same-origin login unexpectedly rejected with %d", http.StatusForbidden)
 	}
 }
 

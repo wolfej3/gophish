@@ -25,7 +25,6 @@ import (
 	templatefs "github.com/gophish/gophish/templates"
 	"github.com/gophish/gophish/util"
 	"github.com/gophish/gophish/worker"
-	"github.com/gorilla/csrf"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
@@ -210,19 +209,25 @@ func (as *AdminServer) registerRoutes() {
 	// Setup static file serving
 	router.PathPrefix("/").Handler(static.Handler())
 
-	// Setup CSRF Protection
-	csrfKey := []byte(as.config.CSRFKey)
-	if len(csrfKey) == 0 {
-		csrfKey = []byte(auth.GenerateSecureKey(auth.APIKeyLength))
+	// Setup cross-origin request protection (CSRF defense) using the Go
+	// standard library's Sec-Fetch-Site/Origin mechanism, replacing the
+	// unmaintained gorilla/csrf (which has an unfixable TrustedOrigins flaw,
+	// GO-2025-3884). Unsafe requests must come from gophish's own origin or a
+	// configured trusted origin; safe methods (GET/HEAD/OPTIONS) are allowed.
+	crossOrigin := http.NewCrossOriginProtection()
+	for _, origin := range as.config.TrustedOrigins {
+		normalized := normalizeTrustedOrigin(origin)
+		if err := crossOrigin.AddTrustedOrigin(normalized); err != nil {
+			log.Fatalf("invalid admin_server.trusted_origins entry %q: %v", origin, err)
+		}
+		if normalized != origin {
+			log.Warnf("admin_server.trusted_origins: assuming https for %q; "+
+				"set an explicit scheme (e.g. %q) to silence this", origin, normalized)
+		}
 	}
-	csrfHandler := csrf.Protect(csrfKey,
-		csrf.FieldName("csrf_token"),
-		csrf.Secure(as.config.CookiesSecure()),
-		csrf.TrustedOrigins(as.config.TrustedOrigins))
-	adminHandler := csrfHandler(router)
+	var adminHandler http.Handler = mid.Use(router.ServeHTTP, crossOriginProtect(crossOrigin), mid.GetContext, mid.ApplySecurityHeaders)
 	// Only send the session cookie over HTTPS, unless secure_cookies is off
 	mid.Store.Options.Secure = as.config.CookiesSecure()
-	adminHandler = mid.Use(adminHandler.ServeHTTP, mid.CSRFExceptions, mid.GetContext, mid.ApplySecurityHeaders)
 
 	// Setup GZIP compression
 	gzipWrapper, _ := gziphandler.NewGzipLevelHandler(gzip.BestCompression)
@@ -241,11 +246,40 @@ func (as *AdminServer) registerRoutes() {
 	as.server.Handler = adminHandler
 }
 
+// normalizeTrustedOrigin turns a configured trusted origin into the
+// "scheme://host[:port]" form the standard library requires. A bare host
+// (the legacy config format, and what docker's ADMIN_TRUSTED_ORIGINS writes)
+// is assumed to be https, the secure default; operators that terminate TLS
+// elsewhere can configure an explicit http:// origin.
+func normalizeTrustedOrigin(origin string) string {
+	if strings.Contains(origin, "://") {
+		return origin
+	}
+	return "https://" + origin
+}
+
+// crossOriginProtect wraps the handler with the standard library's
+// cross-origin request checks, skipping the routes gophish exempts (the
+// token-authenticated API and the SAML assertion consumer), which authenticate
+// and defend against CSRF by other means.
+func crossOriginProtect(cop *http.CrossOriginProtection) func(http.Handler) http.HandlerFunc {
+	return func(next http.Handler) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			if !mid.IsCSRFExempt(r) {
+				if err := cop.Check(r); err != nil {
+					http.Error(w, "Forbidden - "+err.Error(), http.StatusForbidden)
+					return
+				}
+			}
+			next.ServeHTTP(w, r)
+		}
+	}
+}
+
 type templateParams struct {
 	Title         string
 	Flashes       []interface{}
 	User          models.User
-	Token         string
 	Version       string
 	ModifySystem  bool
 	ManageTenants bool
@@ -259,7 +293,6 @@ func newTemplateParams(r *http.Request) templateParams {
 	modifySystem, _ := user.HasPermission(models.PermissionModifySystem)
 	manageTenants, _ := user.HasPermission(models.PermissionManageTenants)
 	return templateParams{
-		Token:         csrf.Token(r),
 		User:          user,
 		ModifySystem:  modifySystem,
 		ManageTenants: manageTenants,
@@ -452,7 +485,6 @@ type loginParams struct {
 	User       models.User
 	Title      string
 	Flashes    []interface{}
-	Token      string
 	SSOButtons []ssoButton
 	Next       string
 	// PasswordLoginDisabled hides the username and password form
@@ -462,7 +494,6 @@ type loginParams struct {
 func (as *AdminServer) newLoginParams(r *http.Request) loginParams {
 	return loginParams{
 		Title:      "Login",
-		Token:      csrf.Token(r),
 		SSOButtons: as.ssoButtons(),
 		Next:       r.FormValue("next"),
 

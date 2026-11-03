@@ -24,9 +24,6 @@
         manage_tenants : {{ .ManageTenants }}
     }
     {{end}}
-    {{if .Token}}
-        var csrf_token = {{.Token}}
-    {{end}}
     </script>
 </head>
 

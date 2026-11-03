@@ -171,7 +171,7 @@ const impersonate = (id) => {
 
          fetch('/impersonate', {
                 method: 'post',
-                body: "username=" + user.username + "&csrf_token=" + encodeURIComponent(csrf_token),
+                body: "username=" + encodeURIComponent(user.username),
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                   },

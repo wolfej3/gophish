@@ -36,7 +36,6 @@
                 <button class="btn btn-default" id="apiRevealButton"><i class="fa fa-eye"></i> Reveal</button>
                 <form id="apiResetForm" style="display:inline">
                     <button class="btn btn-primary"><i class="fa fa-refresh" type="submit"></i> Reset</button>
-                    <input type="hidden" name="csrf_token" value="{{.Token}}" />
                 </form>
             </div>
             <div class="row hidden" id="apiRevealPrompt" style="margin-top:8px;">
@@ -92,7 +91,6 @@
                             class="form-control" />
                     </div>
                 </div>
-                <input type="hidden" name="csrf_token" value="{{.Token}}" />
                 <br />
                 <button class="btn btn-primary" type="submit"><i class="fa fa-save"></i> Save</button>
             </form>
@@ -183,7 +181,6 @@
                         </div>
                         <button class="btn btn-primary" type="submit"><i class="fa fa-lock"></i> Set Up</button>
                     </div>
-                    <input type="hidden" name="csrf_token" value="{{.Token}}" />
                 </form>
                 <div id="totpSetup" class="hidden">
                     <br />
@@ -199,7 +196,6 @@
                             </div>
                             <button class="btn btn-primary" type="submit"><i class="fa fa-check"></i> Enable</button>
                         </div>
-                        <input type="hidden" name="csrf_token" value="{{.Token}}" />
                     </form>
                 </div>
             </div>
@@ -222,7 +218,6 @@
                                 class="form-control" />
                         </div>
                     </div>
-                    <input type="hidden" name="csrf_token" value="{{.Token}}" />
                     <br />
                     <button class="btn btn-primary" type="button" id="totpRegenerate"><i class="fa fa-refresh"></i> New Recovery Codes</button>
                     <button class="btn btn-danger" type="button" id="totpDisable"><i class="fa fa-unlock"></i> Turn Off</button>

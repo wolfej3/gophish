@@ -112,16 +112,16 @@ Gophish is tested with MySQL 8.4.
 
 ### Admin Server TLS
 
-The admin interface must be reached over HTTPS. Its CSRF protection rejects logins and other form submissions from plain `http://` pages, so an admin server reached over plain HTTP will show the login page but refuse every login with a `403 Forbidden` error.
+The admin interface should be reached over HTTPS so credentials and the session cookie aren't exposed in transit. Its cross-origin protection (CSRF defense) uses the browser's `Sec-Fetch-Site`/`Origin` headers to reject state-changing requests that don't originate from Gophish's own origin (or a configured `trusted_origins`); same-origin logins and form submissions are accepted whether served over HTTP or HTTPS.
 
 There are two supported setups:
 
 - **Built-in TLS (the default).** Keep `"use_tls": true` in the `admin_server` section of `config.json`. Gophish generates a self-signed certificate on first run, or you can point `cert_path` and `key_path` at your own certificate.
 - **A TLS-terminating reverse proxy.** Set `"use_tls": false` and put a proxy such as nginx or Caddy in front of Gophish, serving the admin interface to browsers over HTTPS. Gophish logs a warning at startup when TLS is off as a reminder that it must sit behind such a proxy.
 
-Either way, the session and CSRF cookies are marked `Secure`, so browsers only send them over HTTPS. Set `"secure_cookies": false` only for a setup where browsers reach the admin interface over plain HTTP.
+Either way, the session cookie is marked `Secure`, so browsers only send it over HTTPS. Set `"secure_cookies": false` only for a setup where browsers reach the admin interface over plain HTTP.
 
-If you access the admin interface through a different hostname than the one the request arrives with (for example, a proxy that rewrites the `Host` header), add the browser-facing host to `trusted_origins`. Entries are host names with an optional port and no scheme, e.g. `["gophish.example.com"]` or `["gophish.example.com:8443"]`. Only list hosts you control: the CSRF library doesn't check the scheme of trusted origins ([GO-2025-3884](https://pkg.go.dev/vuln/GO-2025-3884), no upstream fix yet), so each entry should only ever serve Gophish over HTTPS.
+If you access the admin interface through a different hostname than the one the request arrives with (for example, a proxy that rewrites the `Host` header), add the browser-facing origin to `trusted_origins`. Entries are `scheme://host[:port]`, e.g. `["https://gophish.example.com"]` or `["https://gophish.example.com:8443"]`; a bare host (`gophish.example.com`) is assumed `https`. Each must exactly match the `Origin` header the browser sends.
 
 In Docker, the admin server uses built-in TLS unless `ADMIN_USE_TLS=false` is set.
 
@@ -167,8 +167,8 @@ Gophish reads a single JSON file (`config.json` by default, or the path passed w
 | `listen_url` | `127.0.0.1:3333` | Address the admin interface listens on. |
 | `use_tls` | `true` | Serve built-in TLS. Required unless a proxy terminates TLS — see [Admin Server TLS](#admin-server-tls). |
 | `cert_path` / `key_path` | `gophish_admin.crt` / `.key` | TLS cert/key; self-signed on first run if absent. |
-| `secure_cookies` | `true` | Mark the session and CSRF cookies `Secure`, even when `use_tls` is off. |
-| `trusted_origins` | `[]` | Extra browser-facing hosts (`host[:port]`) accepted by CSRF when behind a host-rewriting proxy. |
+| `secure_cookies` | `true` | Mark the session cookie `Secure`, even when `use_tls` is off. |
+| `trusted_origins` | `[]` | Extra browser-facing origins (`scheme://host[:port]`; bare host assumed `https`) accepted by the cross-origin check when behind a host-rewriting proxy. |
 | `trusted_proxies` | `[]` | CIDRs/IPs of proxies whose forwarded-for headers are trusted. See [Reverse proxies](#reverse-proxies-and-client-ips). |
 | `allowed_internal_hosts` | `[]` | Internal hosts server-side fetches (Import Site, webhooks) may reach; otherwise internal/loopback/metadata addresses are blocked. |
 | `audit_log_retention_days` | `0` | Delete audit log entries older than this many days (pruned at startup and daily). `0` keeps them forever. |
@@ -596,9 +596,7 @@ This fork addresses the following advisories against gophish v0.12.1, each with 
 | CVE-2022-45003 | DoS via autofocus in a cloned site | `autofocus` stripped on import |
 | CVE-2022-45004 | XSS via a crafted landing page | Not applicable: landing-page HTML is never rendered in the admin origin |
 
-Additional hardening: credentials are never returned in API responses and are encrypted at rest (AES-256-GCM; see [Credential encryption at rest](#credential-encryption-at-rest)); SSO won't auto-create admins without an explicit flag; LDAP refuses plaintext connections without TLS; rendered templates are size-capped; and admin responses carry `nosniff`, `Referrer-Policy`, CSP `frame-ancestors`, and `X-Frame-Options`.
-
-One upstream issue has no fix yet: [GO-2025-3884](https://pkg.go.dev/vuln/GO-2025-3884) in `gorilla/csrf` (`trusted_origins` ignores scheme), which only applies when `trusted_origins` is set — see [Admin Server TLS](#admin-server-tls).
+Additional hardening: cross-origin (CSRF) protection uses the Go standard library's `Sec-Fetch-Site`/`Origin` mechanism rather than the unmaintained `gorilla/csrf` (which has an unfixable `trusted_origins` scheme-confusion flaw, [GO-2025-3884](https://pkg.go.dev/vuln/GO-2025-3884)); credentials are never returned in API responses and are encrypted at rest (AES-256-GCM; see [Credential encryption at rest](#credential-encryption-at-rest)); SSO won't auto-create admins without an explicit flag; LDAP refuses plaintext connections without TLS; rendered templates are size-capped; and admin responses carry `nosniff`, `Referrer-Policy`, `Strict-Transport-Security`, CSP `frame-ancestors`, and `X-Frame-Options`.
 
 ### Documentation
 

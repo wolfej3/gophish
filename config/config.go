@@ -12,13 +12,20 @@ import (
 
 // AdminServer represents the Admin server configuration details
 type AdminServer struct {
-	ListenURL            string   `json:"listen_url"`
-	UseTLS               bool     `json:"use_tls"`
-	CertPath             string   `json:"cert_path"`
-	KeyPath              string   `json:"key_path"`
+	ListenURL string `json:"listen_url"`
+	UseTLS    bool   `json:"use_tls"`
+	CertPath  string `json:"cert_path"`
+	KeyPath   string `json:"key_path"`
+	// CSRFKey is unused since cross-origin protection moved to the standard
+	// library's Sec-Fetch-Site/Origin mechanism (no signed token). Kept so
+	// existing config files that still set it load without error.
 	CSRFKey              string   `json:"csrf_key"`
 	AllowedInternalHosts []string `json:"allowed_internal_hosts"`
-	TrustedOrigins       []string `json:"trusted_origins"`
+	// TrustedOrigins are additional origins (beyond the admin server's own)
+	// allowed to make state-changing requests, for deployments that serve the
+	// UI from a different host. Values are "scheme://host[:port]"; a bare host
+	// is assumed https. Each must exactly match the browser's Origin header.
+	TrustedOrigins []string `json:"trusted_origins"`
 	// SecureCookies marks the session and CSRF cookies Secure, so browsers
 	// only send them over HTTPS. Nil (the default) means true, even when
 	// use_tls is off, since the admin server is then expected to sit behind a

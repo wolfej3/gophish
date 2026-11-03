@@ -166,9 +166,6 @@ function edit(id) {
     $("#csvupload").fileupload({
         url: "/api/import/group",
         dataType: "json",
-        beforeSend: function (xhr) {
-            xhr.setRequestHeader('X-CSRF-Token', csrf_token);
-        },
         add: function (e, data) {
             $("#modal\\.flashes").empty()
             var acceptFileTypes = /(csv|txt)$/i;

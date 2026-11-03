@@ -8,7 +8,6 @@ import (
 
 	ctx "github.com/gophish/gophish/context"
 	"github.com/gophish/gophish/models"
-	"github.com/gorilla/csrf"
 )
 
 // CSRFExemptPrefixes are a list of routes that are exempt from CSRF protection
@@ -20,25 +19,22 @@ var CSRFExemptPrefixes = []string{
 	"/saml/acs",
 }
 
-// CSRFExceptions is a middleware that prevents CSRF checks on routes listed in
-// CSRFExemptPrefixes. /api is exempt only for requests authenticated with an
-// API token; browser requests that rely on the session cookie must still
-// carry a CSRF token, so an in-page XSS or a cross-site form can't drive the
-// API.
-func CSRFExceptions(handler http.Handler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		for _, prefix := range CSRFExemptPrefixes {
-			if !strings.HasPrefix(r.URL.Path, prefix) {
-				continue
-			}
-			if prefix == "/api" && !hasAPIToken(r) {
-				break
-			}
-			r = csrf.UnsafeSkipCheck(r)
-			break
+// IsCSRFExempt reports whether a request is exempt from cross-origin (CSRF)
+// checks because it is one of the routes in CSRFExemptPrefixes. /api is exempt
+// only for requests authenticated with an API token; browser requests that
+// rely on the session cookie must still pass the cross-origin check, so an
+// in-page XSS or a cross-site form can't drive the API.
+func IsCSRFExempt(r *http.Request) bool {
+	for _, prefix := range CSRFExemptPrefixes {
+		if !strings.HasPrefix(r.URL.Path, prefix) {
+			continue
 		}
-		handler.ServeHTTP(w, r)
+		if prefix == "/api" && !hasAPIToken(r) {
+			return false
+		}
+		return true
 	}
+	return false
 }
 
 // hasAPIToken reports whether the request presents an API token (an
@@ -286,6 +282,14 @@ func ApplySecurityHeaders(next http.Handler) http.HandlerFunc {
 		// other origins via the Referer header.
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "same-origin")
+		// HSTS tells browsers to only ever reach the admin over HTTPS. It
+		// backstops the cross-origin check for the rare pre-2023 browser that
+		// omits Sec-Fetch-Site (where the Origin/Host fallback can't tell an
+		// http origin from https). Browsers ignore it on plaintext responses,
+		// so it's inert on the deliberate use_tls:false dev path and only
+		// takes effect once the response reaches the browser over TLS
+		// (directly or via a terminating proxy).
+		w.Header().Set("Strict-Transport-Security", "max-age=31536000")
 		next.ServeHTTP(w, r)
 	}
 }

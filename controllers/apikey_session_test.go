@@ -6,8 +6,6 @@ import (
 	"net/url"
 	"strings"
 	"testing"
-
-	"github.com/PuerkitoBio/goquery"
 )
 
 // loginJar logs the admin in and returns a cookie-jar client.
@@ -19,25 +17,6 @@ func loginJar(t *testing.T, ctx *testContext) *http.Client {
 		t.Fatalf("login failed: %d", resp.StatusCode)
 	}
 	return client
-}
-
-// pageCSRFToken fetches a page and returns a CSRF token valid for the session.
-func pageCSRFToken(t *testing.T, ctx *testContext, client *http.Client, path string) string {
-	t.Helper()
-	resp, err := client.Get(ctx.adminServer.URL + path)
-	if err != nil {
-		t.Fatalf("error requesting %s: %v", path, err)
-	}
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
-	resp.Body.Close()
-	if err != nil {
-		t.Fatalf("error parsing %s: %v", path, err)
-	}
-	token, ok := doc.Find("input[name='csrf_token']").First().Attr("value")
-	if !ok {
-		t.Fatalf("no csrf token on %s", path)
-	}
-	return token
 }
 
 // apiReq sends an API request through the full admin server with the given
@@ -70,20 +49,20 @@ func TestSessionAPIReadWorks(t *testing.T) {
 	}
 }
 
-func TestSessionAPIWriteNeedsCSRF(t *testing.T) {
+func TestSessionAPIWriteBlocksCrossOrigin(t *testing.T) {
 	ctx := setupTwoFactorTest(t)
 	defer tearDown(t, ctx)
 	client := loginJar(t, ctx)
-	// No CSRF token -> rejected
-	resp := apiReq(t, ctx, client, http.MethodPost, "/api/groups/", nil)
+	// A cross-origin session POST is rejected before reaching the handler.
+	resp := apiReq(t, ctx, client, http.MethodPost, "/api/groups/", map[string]string{"Sec-Fetch-Site": "cross-site"})
 	if resp.StatusCode != http.StatusForbidden {
-		t.Fatalf("expected 403 for session POST without CSRF, got %d", resp.StatusCode)
+		t.Fatalf("expected 403 for cross-origin session POST, got %d", resp.StatusCode)
 	}
-	// With the token -> passes CSRF (reaches the handler; 400 for the empty body is fine)
-	token := pageCSRFToken(t, ctx, client, "/settings")
-	resp = apiReq(t, ctx, client, http.MethodPost, "/api/groups/", map[string]string{"X-CSRF-Token": token})
+	// A same-origin session POST passes the cross-origin check and reaches the
+	// handler (400 for the empty body is fine; what matters is it's not 403).
+	resp = apiReq(t, ctx, client, http.MethodPost, "/api/groups/", map[string]string{"Sec-Fetch-Site": "same-origin"})
 	if resp.StatusCode == http.StatusForbidden {
-		t.Fatalf("expected the CSRF token to be accepted, still got 403")
+		t.Fatalf("same-origin session POST unexpectedly rejected with 403")
 	}
 }
 

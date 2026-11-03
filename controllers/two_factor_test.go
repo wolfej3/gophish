@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/PuerkitoBio/goquery"
 	"github.com/gophish/gophish/auth"
 	"github.com/gophish/gophish/middleware/ratelimit"
 	"github.com/gophish/gophish/models"
@@ -259,33 +258,16 @@ func TestTwoFactorSettings(t *testing.T) {
 	}
 }
 
-// postFormTo fetches the page at pagePath for its CSRF token, then submits
-// the provided values to path.
+// postFormTo submits the provided values to path, sending the Referer a
+// browser would send when posting from pagePath.
 func postFormTo(t *testing.T, ctx *testContext, client *http.Client, pagePath, path string, values url.Values) *http.Response {
-	resp, err := client.Get(ctx.adminServer.URL + pagePath)
-	if err != nil {
-		t.Fatalf("error requesting %s: %v", pagePath, err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("unexpected status code requesting %s. expected %d got %d", pagePath, http.StatusOK, resp.StatusCode)
-	}
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
-	resp.Body.Close()
-	if err != nil {
-		t.Fatalf("error parsing %s: %v", pagePath, err)
-	}
-	token, ok := doc.Find("input[name='csrf_token']").First().Attr("value")
-	if !ok {
-		t.Fatalf("unable to find csrf_token on %s", pagePath)
-	}
-	values.Set("csrf_token", token)
 	req, err := http.NewRequest("POST", ctx.adminServer.URL+path, strings.NewReader(values.Encode()))
 	if err != nil {
 		t.Fatalf("error creating request: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Referer", fmt.Sprintf("%s%s", ctx.adminServer.URL, pagePath))
-	resp, err = client.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("error posting to %s: %v", path, err)
 	}
