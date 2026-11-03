@@ -399,3 +399,38 @@ The preview/scanner bot filter (which suppresses false clicks from link-preview
 and email-security bots) ships default-on with a built-in denylist. A follow-up
 could make it configurable — per-campaign toggle, or an editable denylist — for
 operators who specifically want to see scanner activity.
+
+## Rebranding / white-labeling (parked — owner not ready yet)
+
+Rename the project and restyle it away from upstream Gophish branding. Deferred
+on 2026-11-03; the MIT dual-copyright + NOTICE attribution was done separately,
+this is only the cosmetic/identity rename. Open decisions to settle before
+starting:
+
+- **Name:** working idea is **GoFlyPhish** (display) / `goflyphish` (binary,
+  package), not yet confirmed.
+- **Rename depth — pick one:**
+  - *Branding only* (recommended): change every human-visible name — UI
+    title/navbar, page `<title>`s, logo/wordmark, README and docs, the built
+    binary name — but keep the Go module path `github.com/gophish/gophish` and
+    all internal import paths. Small, low-risk diff.
+  - *Full module rename*: also rewrite the module path to the owner's namespace
+    (e.g. `github.com/wolfej3/goflyphish`) and every internal import across all
+    `.go` files. Large, invasive diff; only worth it to publish as a distinct
+    Go module.
+- **Colors:** "change up the color scheme" — direction not chosen. Current
+  palette is navy `#2c3e50` chrome + teal-green `#1abc9c` primary, with chart
+  accents (`#f05b4f` red, `#f9bf3b` yellow, `#F39C12` orange, `#c0392b` MFA).
+  Candidate directions: shift to blue/indigo; keep green+navy and only swap the
+  logo; or a fresh palette (primary + accents, light/dark) chosen and reviewed
+  first.
+- **Logo/icon:** replace the navy hexagon + fishhook mark. Starting point could
+  be a generated SVG wordmark/icon in the new name + colors, later swapped for a
+  professional design. Also the favicon and any embedded logo assets under
+  `static/`.
+
+**Note — trademark vs. copyright:** relicensing/forking gives no rights to the
+"Gophish" name or branding. A public release under a new name should scrub the
+"Gophish" mark from user-facing surfaces (the LICENSE still refers to the
+original "Gophish Community Edition" as attribution, which is correct and
+stays).
