@@ -170,12 +170,18 @@ submit keeps the result status at Submitted Data; `"Submitted MFA Code"` is now
 in `statusMapping` (results) and `statsMapping`/`statuses` (dashboard). Bundles
 rebuilt. Verified: API `submitted_mfa` stat correct end-to-end against a
 throwaway instance (4 recipients → submitted_data 2, submitted_mfa 1), and the
-served bundles + embedded templates carry the wiring. A pixel-level visual
-render wasn't done this session (the self-signed admin cert blocks the built-in
-browser and Claude in Chrome wasn't connected).
+served bundles + embedded templates carry the wiring. Pixel-level render
+confirmed 2026-11-02 in the built-in browser against a throwaway instance (6
+recipients → clicked 6, submitted_data 3, submitted_mfa 2): the dark-red MFA
+gauge renders between Submitted Data and Reported on both the dashboard and the
+campaign results page, the dashboard details table shows the `fa-key` column
+with the count, and an expanded recipient timeline renders the "Submitted MFA
+Code" node with its key icon. (To reach the HTTPS-only admin over plain HTTP the
+throwaway config set `admin_server.use_tls:false` + `secure_cookies:false` +
+`trusted_origins:["127.0.0.1:3399"]`; production config is unchanged.)
 
 **Possible later enhancement (not built):** a live browser pass over the
-landing-page editor toggle and the gauges (the backend + HTTP two-step are
+landing-page editor toggle (the gauges are now verified; the backend + HTTP two-step are
 covered by unit/controller tests on SQLite and MySQL, and the served
 bundles/templates were confirmed to carry the changes).
 
