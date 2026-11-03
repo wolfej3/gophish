@@ -612,7 +612,8 @@ Gophish - Open-Source Phishing Framework
 
 The MIT License (MIT)
 
-Copyright (c) 2013 - 2020 Jordan Wright
+Copyright (c) 2013-2020 Jordan Wright (original Gophish Community Edition)
+Copyright (c) 2026 John Wolfe (modifications in this fork)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software ("Gophish Community Edition") and associated documentation files (the "Software"), to deal
@@ -632,3 +633,5 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
+
+This project is a fork of the original [Gophish](https://github.com/gophish/gophish) by Jordan Wright. The upstream MIT copyright and permission notice are retained in full; see the [`NOTICE`](NOTICE) file for attribution details.
