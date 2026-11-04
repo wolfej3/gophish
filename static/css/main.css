@@ -110,15 +110,15 @@ ul .dropdown-menu .ng-isolate-scope {
 /* Single sign-on buttons are outlined, so that their text stays readable
    next to the primary sign in button. */
 .form-signin .btn-sso {
-    color: #2c3e50;
+    color: #264653;
     background-color: #ffffff;
-    border: 2px solid #2c3e50;
+    border: 2px solid #264653;
 }
 
 .form-signin .btn-sso:hover,
 .form-signin .btn-sso:focus {
     color: #ffffff;
-    background-color: #2c3e50;
+    background-color: #264653;
 }
 
 #logo {
@@ -300,7 +300,7 @@ p {
 }
 
 .ct-point-sending {
-    fill: #428bca !important;
+    fill: #2a9d8f !important;
 }
 
 .ct-point-error {
@@ -316,7 +316,7 @@ p {
 }
 
 .ct-point-sent {
-    fill: #1abc9c !important;
+    fill: #2a9d8f !important;
 }
 
 .ct-point-success {
@@ -328,7 +328,7 @@ p {
     display: inline-block;
     min-width: 5em;
     padding: .5em;
-    background: #283F50;
+    background: #264653;
     color: #ffffff;
     font-weight: 700;
     text-align: center;
@@ -344,7 +344,7 @@ p {
     display: inline-block;
     min-width: 5em;
     padding: .5em;
-    background: #283F50;
+    background: #264653;
     color: #ffffff;
     font-weight: 700;
     text-align: center;
@@ -364,7 +364,7 @@ p {
     height: 0;
     margin-left: -15px;
     border: 15px solid transparent;
-    border-top-color: #283F50
+    border-top-color: #264653
 }
 
 .chartist-chart {
@@ -402,7 +402,7 @@ p {
 }
 
 .ct-series-a .ct-slice-donut {
-    stroke: #1abc9c !important;
+    stroke: #2a9d8f !important;
 }
 
 .ct-slice-donut.ct-slice-donut-error {
@@ -410,7 +410,7 @@ p {
 }
 
 .ct-slice-donut.ct-slice-donut-sent {
-    stroke: #1abc9c !important
+    stroke: #2a9d8f !important
 }
 
 .ct-slice-donut.ct-slice-donut-opened {
@@ -426,7 +426,7 @@ p {
 }
 
 .ct-slice-donut.ct-slice-donut-sending {
-    stroke: #428bca !important;
+    stroke: #2a9d8f !important;
 }
 
 .ct-legend-error {
@@ -434,7 +434,7 @@ p {
 }
 
 .ct-legend-sent {
-    background-color: #1abc9c !important;
+    background-color: #2a9d8f !important;
 }
 
 .ct-legend-opened {
@@ -450,7 +450,7 @@ p {
 }
 
 .ct-legend-sending {
-    background-color: #428bca !important;
+    background-color: #2a9d8f !important;
 }
 
 .label-clicked {
@@ -515,7 +515,7 @@ table.dataTable thead .sorting_desc:after {
     top: initial !important;
     right: initial !important;
     left: 6px;
-    color: #1abc9c;
+    color: #2a9d8f;
 }
 
 table.dataTable thead .sorting:after {
@@ -693,8 +693,8 @@ table.dataTable {
 
 .btn-blue {
     color: #fff;
-    background-color: #428bca;
-    border-color: #428bca;
+    background-color: #2a9d8f;
+    border-color: #2a9d8f;
 }
 
 .btn-blue:hover {
@@ -726,7 +726,7 @@ table.dataTable {
 
 .color-sent {
     font-weight: bold;
-    color: #1abc9c;
+    color: #2a9d8f;
 }
 
 .color-opened {
