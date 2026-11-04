@@ -70,8 +70,8 @@
 
 .checkbox-primary input[type="checkbox"]:checked + label::before,
 .checkbox-primary input[type="radio"]:checked + label::before {
-  background-color: #2a9d8f;
-  border-color: #2a9d8f;
+  background-color: #519B8F;
+  border-color: #519B8F;
 }
 .checkbox-primary input[type="checkbox"]:checked + label::after,
 .checkbox-primary input[type="radio"]:checked + label::after {
@@ -188,13 +188,13 @@
 }
 
 .radio-primary input[type="radio"] + label::after {
-  background-color: #2a9d8f;
+  background-color: #519B8F;
 }
 .radio-primary input[type="radio"]:checked + label::before {
-  border-color: #2a9d8f;
+  border-color: #519B8F;
 }
 .radio-primary input[type="radio"]:checked + label::after {
-  background-color: #2a9d8f;
+  background-color: #519B8F;
 }
 
 .radio-danger input[type="radio"] + label::after {

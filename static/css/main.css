@@ -300,7 +300,7 @@ p {
 }
 
 .ct-point-sending {
-    fill: #2a9d8f !important;
+    fill: #519B8F !important;
 }
 
 .ct-point-error {
@@ -316,7 +316,7 @@ p {
 }
 
 .ct-point-sent {
-    fill: #2a9d8f !important;
+    fill: #519B8F !important;
 }
 
 .ct-point-success {
@@ -402,7 +402,7 @@ p {
 }
 
 .ct-series-a .ct-slice-donut {
-    stroke: #2a9d8f !important;
+    stroke: #519B8F !important;
 }
 
 .ct-slice-donut.ct-slice-donut-error {
@@ -410,7 +410,7 @@ p {
 }
 
 .ct-slice-donut.ct-slice-donut-sent {
-    stroke: #2a9d8f !important
+    stroke: #519B8F !important
 }
 
 .ct-slice-donut.ct-slice-donut-opened {
@@ -426,7 +426,7 @@ p {
 }
 
 .ct-slice-donut.ct-slice-donut-sending {
-    stroke: #2a9d8f !important;
+    stroke: #519B8F !important;
 }
 
 .ct-legend-error {
@@ -434,7 +434,7 @@ p {
 }
 
 .ct-legend-sent {
-    background-color: #2a9d8f !important;
+    background-color: #519B8F !important;
 }
 
 .ct-legend-opened {
@@ -450,7 +450,7 @@ p {
 }
 
 .ct-legend-sending {
-    background-color: #2a9d8f !important;
+    background-color: #519B8F !important;
 }
 
 .label-clicked {
@@ -515,7 +515,7 @@ table.dataTable thead .sorting_desc:after {
     top: initial !important;
     right: initial !important;
     left: 6px;
-    color: #2a9d8f;
+    color: #519B8F;
 }
 
 table.dataTable thead .sorting:after {
@@ -693,8 +693,8 @@ table.dataTable {
 
 .btn-blue {
     color: #fff;
-    background-color: #2a9d8f;
-    border-color: #2a9d8f;
+    background-color: #519B8F;
+    border-color: #519B8F;
 }
 
 .btn-blue:hover {
@@ -726,7 +726,7 @@ table.dataTable {
 
 .color-sent {
     font-weight: bold;
-    color: #2a9d8f;
+    color: #519B8F;
 }
 
 .color-opened {
@@ -788,4 +788,10 @@ table.dataTable {
 }
 #password-strength-container {
     height: 40px;
+}
+/* Cyber Flyers brand: rust badges/highlights */
+.badge,
+.nav-badge {
+    background-color: #7D3E2C;
+    color: #ffffff;
 }
